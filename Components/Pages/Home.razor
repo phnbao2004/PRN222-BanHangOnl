@@ -8,7 +8,8 @@
     <div style="position:absolute;right:0;top:0;bottom:0;width:40%;background:radial-gradient(circle at 70% 30%, rgba(255,255,255,.12) 0%, transparent 60%), radial-gradient(circle at 30% 80%, rgba(255,255,255,.08) 0%, transparent 50%);pointer-events:none;"></div>
     <div style="z-index:1;">
         <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.2);color:#fff;font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;margin-bottom:16px;">
-            🔥 Flash Sale hôm nay
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Flash Sale hôm nay
         </div>
         <div style="font-size:clamp(24px,4vw,40px);font-weight:800;color:#fff;line-height:1.2;margin-bottom:12px;">
             Thời trang cao cấp<br/>giá tốt nhất thị trường
@@ -17,44 +18,132 @@
             Hàng chính hãng · Giao 2–3 ngày toàn quốc · Đổi trả miễn phí 30 ngày
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;">
-            <a href="/shop" class="btn btn-lg" style="background:#fff;color:var(--brand);font-weight:700;">🛍️ Mua sắm ngay</a>
+            <a href="/shop" class="btn btn-lg" style="background:#fff;color:var(--brand);font-weight:700;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+                Mua sắm ngay
+            </a>
             <a href="/shop" class="btn btn-lg" style="background:rgba(255,255,255,.2);color:#fff;border:1.5px solid rgba(255,255,255,.5);">Xem tất cả</a>
         </div>
     </div>
-    <div style="z-index:1;font-size:clamp(60px,10vw,120px);filter:drop-shadow(0 8px 24px rgba(0,0,0,.2));user-select:none;">👗</div>
+    <div style="z-index:1;filter:drop-shadow(0 8px 24px rgba(0,0,0,.2));user-select:none;">
+        <svg width="clamp(80px,12vw,140px)" height="clamp(80px,12vw,140px)" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="50" cy="88" rx="28" ry="6" fill="rgba(0,0,0,.12)"/>
+            <path d="M30 30 Q20 26 18 38 L24 42 Q28 32 36 34 L50 30 L64 34 Q72 32 76 42 L82 38 Q80 26 70 30 L62 22 Q56 14 50 14 Q44 14 38 22 Z" fill="rgba(255,255,255,0.9)"/>
+            <path d="M36 34 L36 80 Q36 84 40 84 L60 84 Q64 84 64 80 L64 34 L50 30 Z" fill="rgba(255,255,255,0.85)"/>
+            <path d="M36 34 L30 60 L36 62 L38 46 L36 80" stroke="rgba(255,255,255,0.4)" stroke-width="1" fill="none"/>
+            <path d="M64 34 L70 60 L64 62 L62 46 L64 80" stroke="rgba(255,255,255,0.4)" stroke-width="1" fill="none"/>
+            <path d="M42 84 Q42 92 50 92 Q58 92 58 84" fill="rgba(255,255,255,0.7)"/>
+        </svg>
+    </div>
 </div>
 
 <!-- STATS BAR -->
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:36px;">
-    @foreach (var (icon,num,label) in new[]{("🚚","FREE","Ship toàn quốc"),("🔄","30","Ngày đổi trả"),("✅","100%","Hàng chính hãng"),("💬","24/7","Hỗ trợ khách hàng")})
-    {
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 16px;text-align:center;">
-            <div style="font-size:24px;margin-bottom:6px;">@icon</div>
-            <div style="font-size:18px;font-weight:800;color:var(--brand);">@num</div>
-            <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;">@label</div>
+    <!-- Ship toàn quốc -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 16px;text-align:center;">
+        <div style="display:flex;justify-content:center;margin-bottom:8px;">
+            <div style="width:44px;height:44px;border-radius:12px;background:#dbeafe;display:flex;align-items:center;justify-content:center;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            </div>
         </div>
-    }
+        <div style="font-size:18px;font-weight:800;color:var(--brand);">FREE</div>
+        <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;">Ship toàn quốc</div>
+    </div>
+    <!-- Đổi trả -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 16px;text-align:center;">
+        <div style="display:flex;justify-content:center;margin-bottom:8px;">
+            <div style="width:44px;height:44px;border-radius:12px;background:#dcfce7;display:flex;align-items:center;justify-content:center;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+            </div>
+        </div>
+        <div style="font-size:18px;font-weight:800;color:var(--brand);">30</div>
+        <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;">Ngày đổi trả</div>
+    </div>
+    <!-- Hàng chính hãng -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 16px;text-align:center;">
+        <div style="display:flex;justify-content:center;margin-bottom:8px;">
+            <div style="width:44px;height:44px;border-radius:12px;background:#fef3c7;display:flex;align-items:center;justify-content:center;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+            </div>
+        </div>
+        <div style="font-size:18px;font-weight:800;color:var(--brand);">100%</div>
+        <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;">Hàng chính hãng</div>
+    </div>
+    <!-- Hỗ trợ -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 16px;text-align:center;">
+        <div style="display:flex;justify-content:center;margin-bottom:8px;">
+            <div style="width:44px;height:44px;border-radius:12px;background:#ede9fe;display:flex;align-items:center;justify-content:center;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.69 19.79 19.79 0 01.07 5a2 2 0 012-2.18h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.91a16 16 0 006.06 6.06l.41-.41a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+            </div>
+        </div>
+        <div style="font-size:18px;font-weight:800;color:var(--brand);">24/7</div>
+        <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;">Hỗ trợ khách hàng</div>
+    </div>
 </div>
 
 <!-- CATEGORIES -->
 <div style="margin-bottom:36px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-        <div style="font-size:20px;font-weight:800;">🗂️ Danh mục nổi bật</div>
+        <div style="font-size:20px;font-weight:800;display:flex;align-items:center;gap:8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Danh mục nổi bật
+        </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;">
-        @foreach (var (cat,icon,color) in new[]{("Áo thun","👕","#dbeafe"),("Áo polo","🎽","#dcfce7"),("Áo sơ mi","👔","#fce7f3"),("Áo hoodie","🧥","#ede9fe"),("Áo khoác","🥼","#fef3c7")})
-        {
-            <a href="/shop" style="background:@color;border-radius:var(--radius-lg);padding:20px 12px;text-align:center;text-decoration:none;transition:.15s;display:block;" >
-                <div style="font-size:32px;margin-bottom:8px;">@icon</div>
-                <div style="font-size:13px;font-weight:600;color:var(--text);">@cat</div>
-            </a>
-        }
+        <!-- Áo thun -->
+        <a href="/shop" style="position:relative;border-radius:var(--radius-lg);overflow:hidden;display:block;text-decoration:none;height:180px;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:transform .2s,box-shadow .2s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 28px rgba(0,0,0,.2)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(0,0,0,.12)'">
+            <img src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&q=80" alt="Áo thun" style="width:100%;height:100%;object-fit:cover;display:block;"/>
+            <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.75) 0%,rgba(0,0,0,.15) 55%,transparent 100%);"></div>
+            <div style="position:absolute;bottom:0;left:0;right:0;padding:14px 12px;">
+                <div style="font-size:14px;font-weight:700;color:#fff;letter-spacing:.2px;">Áo thun</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:2px;">Basic &amp; Casual</div>
+            </div>
+        </a>
+        <!-- Áo polo -->
+        <a href="/shop" style="position:relative;border-radius:var(--radius-lg);overflow:hidden;display:block;text-decoration:none;height:180px;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:transform .2s,box-shadow .2s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 28px rgba(0,0,0,.2)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(0,0,0,.12)'">
+            <img src="https://images.unsplash.com/photo-1626497764746-6dc36546b388?w=400&q=80" alt="Áo polo" style="width:100%;height:100%;object-fit:cover;display:block;"/>
+            <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.75) 0%,rgba(0,0,0,.15) 55%,transparent 100%);"></div>
+            <div style="position:absolute;bottom:0;left:0;right:0;padding:14px 12px;">
+                <div style="font-size:14px;font-weight:700;color:#fff;letter-spacing:.2px;">Áo polo</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:2px;">Smart &amp; Sporty</div>
+            </div>
+        </a>
+        <!-- Áo sơ mi -->
+        <a href="/shop" style="position:relative;border-radius:var(--radius-lg);overflow:hidden;display:block;text-decoration:none;height:180px;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:transform .2s,box-shadow .2s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 28px rgba(0,0,0,.2)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(0,0,0,.12)'">
+            <img src="https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=400&q=80" alt="Áo sơ mi" style="width:100%;height:100%;object-fit:cover;display:block;"/>
+            <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.75) 0%,rgba(0,0,0,.15) 55%,transparent 100%);"></div>
+            <div style="position:absolute;bottom:0;left:0;right:0;padding:14px 12px;">
+                <div style="font-size:14px;font-weight:700;color:#fff;letter-spacing:.2px;">Áo sơ mi</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:2px;">Classic &amp; Formal</div>
+            </div>
+        </a>
+        <!-- Áo hoodie -->
+        <a href="/shop" style="position:relative;border-radius:var(--radius-lg);overflow:hidden;display:block;text-decoration:none;height:180px;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:transform .2s,box-shadow .2s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 28px rgba(0,0,0,.2)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(0,0,0,.12)'">
+            <img src="https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=400&q=80" alt="Áo hoodie" style="width:100%;height:100%;object-fit:cover;display:block;"/>
+            <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.75) 0%,rgba(0,0,0,.15) 55%,transparent 100%);"></div>
+            <div style="position:absolute;bottom:0;left:0;right:0;padding:14px 12px;">
+                <div style="font-size:14px;font-weight:700;color:#fff;letter-spacing:.2px;">Áo hoodie</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:2px;">Street &amp; Comfy</div>
+            </div>
+        </a>
+        <!-- Áo khoác -->
+        <a href="/shop" style="position:relative;border-radius:var(--radius-lg);overflow:hidden;display:block;text-decoration:none;height:180px;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:transform .2s,box-shadow .2s;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 28px rgba(0,0,0,.2)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(0,0,0,.12)'">
+            <img src="https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400&q=80" alt="Áo khoác" style="width:100%;height:100%;object-fit:cover;display:block;"/>
+            <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.75) 0%,rgba(0,0,0,.15) 55%,transparent 100%);"></div>
+            <div style="position:absolute;bottom:0;left:0;right:0;padding:14px 12px;">
+                <div style="font-size:14px;font-weight:700;color:#fff;letter-spacing:.2px;">Áo khoác</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:2px;">Outerwear</div>
+            </div>
+        </a>
     </div>
 </div>
 
 <!-- FEATURED PRODUCTS -->
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-    <div style="font-size:20px;font-weight:800;">⭐ Sản phẩm nổi bật</div>
+    <div style="font-size:20px;font-weight:800;display:flex;align-items:center;gap:8px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        Sản phẩm nổi bật
+    </div>
     <a href="/shop" style="font-size:13px;color:var(--brand);font-weight:600;text-decoration:none;">Xem tất cả →</a>
 </div>
 
@@ -63,7 +152,9 @@
 <!-- PROMO BANNER -->
 <div style="margin-top:36px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
     <div style="background:linear-gradient(135deg,#1e293b,#334155);border-radius:var(--radius-lg);padding:28px 24px;display:flex;align-items:center;gap:20px;">
-        <div style="font-size:48px;">🎁</div>
+        <div style="width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg>
+        </div>
         <div>
             <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:6px;">Ưu đãi thành viên VIP</div>
             <div style="font-size:13px;color:#94a3b8;margin-bottom:14px;">Chi tiêu 1.000.000đ nhận ngay đặc quyền VIP</div>
@@ -71,7 +162,9 @@
         </div>
     </div>
     <div style="background:linear-gradient(135deg,#7c3aed,#a855f7);border-radius:var(--radius-lg);padding:28px 24px;display:flex;align-items:center;gap:20px;">
-        <div style="font-size:48px;">🎟️</div>
+        <div style="width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 010-6h20a3 3 0 010 6"/><path d="M2 9v11a1 1 0 001 1h18a1 1 0 001-1V9"/><line x1="12" y1="3" x2="12" y2="20"/></svg>
+        </div>
         <div>
             <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:6px;">Voucher miễn phí</div>
             <div style="font-size:13px;color:rgba(255,255,255,.75);margin-bottom:14px;">Dùng mã FREESHIP cho đơn từ 150k</div>

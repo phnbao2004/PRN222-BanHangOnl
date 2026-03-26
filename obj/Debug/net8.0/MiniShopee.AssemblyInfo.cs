@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MiniShopee")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+328ad5872fc0e6b46f51f6745ac285972c982890")]
 [assembly: System.Reflection.AssemblyProductAttribute("MiniShopee")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MiniShopee")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
