@@ -1,0 +1,135 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@inject MiniShopee.Services.CartState Cart
+@inject NavigationManager Nav
+@implements IDisposable
+
+<nav class="sidebar">
+    <div class="sidebar-logo">
+        <div class="logo-wordmark">Mini<span>Shopee</span></div>
+        <div class="logo-tagline">Thời trang chất lượng cao</div>
+    </div>
+
+    <div class="sidebar-nav">
+
+        <a class="nav-link @A("/")" href="/">
+            Trang chủ
+        </a>
+
+        <AuthorizeView Context="authMain">
+            <Authorized>
+
+                <AuthorizeView Roles="Customer,VipCustomer" Context="authCust">
+                    <Authorized>
+                        <div class="nav-label">Mua sắm</div>
+                        <a class="nav-link @A("/shop")" href="/shop">
+            Sản phẩm
+                        </a>
+                        <a class="nav-link @A("/cart")" href="/cart">
+            Giỏ hàng
+                            @if (Cart.TotalCount > 0) { <span class="nav-badge">@Cart.TotalCount</span> }
+                        </a>
+                        <a class="nav-link @A("/orders")" href="/orders">
+            Đơn hàng
+                        </a>
+                        <a class="nav-link @A("/vouchers-view")" href="/vouchers-view">
+            Voucher
+                        </a>
+                        <a class="nav-link @A("/chat")" href="/chat">
+            Tư vấn
+                        </a>
+                    </Authorized>
+                </AuthorizeView>
+
+                <AuthorizeView Roles="Staff" Context="authStaff">
+                    <Authorized>
+                        <div class="nav-label">Quản lý</div>
+                        <a class="nav-link @A("/manage-orders")" href="/manage-orders">
+            Đơn hàng
+                        </a>
+                        <a class="nav-link @A("/staff/customers")" href="/staff/customers">
+            Khách hàng
+                        </a>
+                        <a class="nav-link @A("/staff/chat")" href="/staff/chat">
+            Hộp thư
+                        </a>
+                        <a class="nav-link @A("/vouchers")" href="/vouchers">
+            Voucher
+                        </a>
+                        <a class="nav-link @A("/reports")" href="/reports">
+            Báo cáo
+                        </a>
+                    </Authorized>
+                </AuthorizeView>
+
+                <AuthorizeView Roles="Admin" Context="authAdmin">
+                    <Authorized>
+                        <div class="nav-label">Quản lý</div>
+                        <a class="nav-link @A("/manage-orders")" href="/manage-orders">
+            Đơn hàng
+                        </a>
+                        <a class="nav-link @A("/staff/customers")" href="/staff/customers">
+            Khách hàng
+                        </a>
+                        <a class="nav-link @A("/staff/chat")" href="/staff/chat">
+            Hộp thư
+                        </a>
+                        <a class="nav-link @A("/vouchers")" href="/vouchers">
+            Voucher
+                        </a>
+                        <a class="nav-link @A("/reports")" href="/reports">
+            Báo cáo
+                        </a>
+                        <div class="nav-label">Quản trị</div>
+                        <a class="nav-link @A("/admin/products")" href="/admin/products">
+            Sản phẩm
+                        </a>
+                        <a class="nav-link @A("/admin/users")" href="/admin/users">
+            Phân quyền
+                        </a>
+                    </Authorized>
+                </AuthorizeView>
+
+                <div class="nav-label">Tài khoản</div>
+                <a class="nav-link @A("/profile")" href="/profile">
+            Hồ sơ
+                </a>
+
+            </Authorized>
+            <NotAuthorized>
+                <div class="nav-label">Tài khoản</div>
+                <a class="nav-link @A("/login")" href="/login">
+            Đăng nhập
+                </a>
+                <a class="nav-link @A("/register")" href="/register">
+            Đăng ký
+                </a>
+            </NotAuthorized>
+        </AuthorizeView>
+
+    </div>
+
+    <div class="sidebar-footer">
+        <AuthorizeView>
+            <Authorized>
+                <form method="post" action="/auth/logout-form">
+                    <button class="logout-btn">
+            Đăng xuất
+                    </button>
+                </form>
+            </Authorized>
+        </AuthorizeView>
+    </div>
+</nav>
+
+@code {
+    private string A(string href)
+    {
+        var uri = Nav.Uri;
+        if (href == "/")
+            return (uri == Nav.BaseUri || uri.TrimEnd('/') == Nav.BaseUri.TrimEnd('/')) ? "active" : "";
+        return uri.Contains(href) ? "active" : "";
+    }
+
+    protected override void OnInitialized() => Cart.OnChange += StateHasChanged;
+    public void Dispose() => Cart.OnChange -= StateHasChanged;
+}

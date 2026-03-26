@@ -1,0 +1,237 @@
+@page "/orders"
+@attribute [Authorize(Roles = "Customer,VipCustomer")]
+
+@using MiniShopee.Models
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject MiniShopee.Services.CommerceService CommerceService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Đơn hàng - MiniShopee</PageTitle>
+
+<div class="page-header">
+    <div class="page-title">Đơn hàng của tôi</div>
+</div>
+
+@if (currentUser?.WarningLevel >= 1)
+{
+    var (warnBg, warnIcon, warnTitle, warnText) = currentUser.WarningLevel switch {
+        1 => ("#fefce8", "⚠️", "Tài khoản đang bị cảnh báo",
+              $"Bạn đã hủy/hoàn {currentUser.CancelCount + currentUser.ReturnCount} đơn hàng. Uy tín còn {currentUser.ReputationPoints}/10. Tiếp tục hủy đơn có thể dẫn đến khóa tài khoản."),
+        2 => ("#fff7ed", "🔴", "Cảnh báo nghiêm trọng",
+              $"Tài khoản có {currentUser.ReturnCount} lần hoàn hàng và {currentUser.CancelCount} lần hủy đơn. Uy tín còn {currentUser.ReputationPoints}/10. Nếu tiếp tục, tài khoản sẽ bị khóa tự động."),
+        _ => ("#fee2e2", "🔒", "Tài khoản có nguy cơ bị khóa",
+              "Hành vi mua sắm của bạn đang bị giám sát. Vui lòng liên hệ hỗ trợ nếu có sự nhầm lẫn.")
+    };
+    <div style="background:@warnBg;border-left:4px solid @(currentUser.WarningLevel==1?"#eab308":currentUser.WarningLevel==2?"#f97316":"#ef4444");
+                border-radius:var(--radius);padding:14px 18px;margin-bottom:20px;display:flex;gap:12px;align-items:flex-start;">
+        <span style="font-size:22px;line-height:1;">@warnIcon</span>
+        <div>
+            <div style="font-weight:700;font-size:13.5px;margin-bottom:4px;">@warnTitle</div>
+            <div style="font-size:12.5px;color:var(--text-2);">@warnText</div>
+            @if (!string.IsNullOrEmpty(currentUser.LastWarningReason))
+            {
+                <div style="font-size:11.5px;color:var(--text-3);margin-top:4px;">Lý do: @currentUser.LastWarningReason</div>
+            }
+        </div>
+    </div>
+}
+
+@if (loading)
+{
+    <div class="text-muted">Đang tải...</div>
+}
+else if (orders.Count == 0)
+{
+    <div class="empty-state">
+        <div class="empty-state-title">Chưa có đơn hàng nào</div>
+        <a class="btn btn-primary mt-3" href="/shop">Mua sắm ngay</a>
+    </div>
+}
+else
+{
+    @foreach (var o in orders)
+    {
+        <div class="order-card">
+
+            <!-- Header -->
+            <div class="order-head">
+                <div class="flex items-center gap-3">
+                    <span class="fw-700">Đơn #@o.Id</span>
+                    <span class="badge @StatusBadge(o.Status)">@StatusLabel(o.Status)</span>
+                    @if (!string.IsNullOrEmpty(o.AppliedVoucherCode))
+                    {
+                        <span class="badge badge-green">🎫 @o.AppliedVoucherCode</span>
+                    }
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-muted text-sm">@o.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                    <span class="fw-700 mono text-brand">@o.TotalVnd.ToString("N0")đ</span>
+                    @if (o.Status == "Pending")
+                    {
+                        <button class="btn btn-ghost btn-sm" style="color:var(--red);" @onclick="() => Cancel(o.Id)">
+                            Hủy đơn
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <!-- Body -->
+            <div class="order-body">
+
+                <!-- Timeline / Cancelled -->
+                @if (o.Status == "Cancelled")
+                {
+                    <div style="padding:12px 0 16px;display:flex;align-items:center;gap:10px;">
+                        <span class="badge badge-red" style="font-size:13px;padding:6px 14px;">❌ Đơn hàng đã bị hủy</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="order-status-bar">
+                        @foreach (var step in Steps)
+                        {
+                            var cls = StepClass(o.Status, step.Key);
+                            <div class="order-step @cls">
+                                <div class="order-step-dot">@(cls == "done" ? "✓" : step.Value.icon)</div>
+                                <div class="order-step-label">@step.Value.label</div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <!-- Shipping info -->
+                <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;margin-bottom:12px;">
+                    <span class="fw-600">Giao đến: </span>
+                    @o.ReceiverName — @o.ReceiverPhone<br />
+                    <span class="text-muted">@o.ShippingAddress</span>
+                </div>
+
+                <!-- Toggle items -->
+                <button class="btn btn-ghost btn-sm" @onclick="() => Toggle(o.Id)">
+                    @(expanded.Contains(o.Id) ? "Thu gọn" : $"Xem {o.Items.Count} sản phẩm")
+                </button>
+
+                @if (expanded.Contains(o.Id))
+                {
+                    <div class="table-wrap mt-3">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Sản phẩm</th><th>Đơn giá</th><th>SL</th><th>Thành tiền</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in o.Items)
+                                {
+                                    <tr>
+                                        <td>@(item.Product?.Name ?? "?")</td>
+                                        <td class="mono">@item.UnitPriceVnd.ToString("N0")đ</td>
+                                        <td>x@item.Quantity</td>
+                                        <td class="fw-700 mono text-brand">@((item.UnitPriceVnd * item.Quantity).ToString("N0"))đ</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+
+            </div><!-- /order-body -->
+
+        </div><!-- /order-card -->
+    }
+}
+
+@if (!string.IsNullOrEmpty(msg))
+{
+    <div class="alert @(msgOk ? "alert-success" : "alert-danger") mt-3">@msg</div>
+}
+
+@code {
+    private record StepInfo(string icon, string label);
+
+    private static readonly Dictionary<string, StepInfo> Steps = new()
+    {
+        ["Pending"]   = new("📋", "Chờ xác nhận"),
+        ["Confirmed"] = new("✅", "Đã xác nhận"),
+        ["Packing"]   = new("📦", "Đóng gói"),
+        ["Shipping"]  = new("🚚", "Đang giao"),
+        ["Delivered"] = new("🎉", "Đã giao"),
+    };
+
+    private ApplicationUser? currentUser;
+    private List<Order> orders = new();
+    private HashSet<int> expanded = new();
+    private bool loading = true;
+    private string msg = "";
+    private bool msgOk;
+    private string? userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(auth.User);
+        currentUser = user;
+        if (user != null)
+        {
+            userId = user.Id;
+            orders = await CommerceService.GetOrdersByUserAsync(user.Id);
+        }
+        loading = false;
+    }
+
+    private void Toggle(int id)
+    {
+        if (!expanded.Add(id)) expanded.Remove(id);
+    }
+
+    private async Task Cancel(int id)
+    {
+        if (userId == null) return;
+        var ok = await CommerceService.CancelOrderAsync(id, userId);
+        if (ok)
+        {
+            msg = "Đã hủy đơn hàng thành công."; msgOk = true;
+            orders = await CommerceService.GetOrdersByUserAsync(userId);
+        }
+        else
+        {
+            msg = "Không thể hủy đơn (chỉ hủy khi đang chờ xác nhận)."; msgOk = false;
+        }
+        _ = Task.Delay(3000).ContinueWith(_ => { msg = ""; InvokeAsync(StateHasChanged); });
+    }
+
+    private static string StatusBadge(string s) => s switch
+    {
+        "Pending"   => "badge-yellow",
+        "Confirmed" => "badge-blue",
+        "Packing"   => "badge-purple",
+        "Shipping"  => "badge-blue",
+        "Delivered" => "badge-green",
+        "Cancelled" => "badge-red",
+        _           => "badge-gray"
+    };
+
+    private static string StatusLabel(string s) => s switch
+    {
+        "Pending"   => "Chờ xác nhận",
+        "Confirmed" => "Đã xác nhận",
+        "Packing"   => "Đang đóng gói",
+        "Shipping"  => "Đang giao hàng",
+        "Delivered" => "Đã giao",
+        "Cancelled" => "Đã hủy",
+        _           => s
+    };
+
+    private static string StepClass(string currentStatus, string stepKey)
+    {
+        if (currentStatus is "Cancelled") return "";
+        var order = new[] { "Pending", "Confirmed", "Packing", "Shipping", "Delivered" };
+        var cur  = Array.IndexOf(order, currentStatus);
+        var step = Array.IndexOf(order, stepKey);
+        if (step < cur)  return "done";
+        if (step == cur) return "active";
+        return "";
+    }
+}

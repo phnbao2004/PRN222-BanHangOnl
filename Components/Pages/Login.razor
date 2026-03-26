@@ -1,0 +1,74 @@
+@page "/login"
+@layout MiniShopee.Components.Layout.AuthLayout
+@inject NavigationManager Nav
+
+<PageTitle>Đăng nhập - MiniShopee</PageTitle>
+
+<div class="auth-title">Đăng nhập</div>
+<div class="auth-sub">Chào mừng trở lại MiniShopee 👋</div>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger mb-4">⚠️ @error</div>
+}
+
+<form method="post" action="/auth/login-form" style="display:flex;flex-direction:column;gap:14px;">
+
+    <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-control" type="email" name="email"
+               placeholder="ban@email.com" required autofocus />
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Mật khẩu</label>
+        <div style="position:relative;">
+            <input class="form-control" type="@(showPwd?"text":"password")" name="password"
+                   placeholder="••••••••" required style="padding-right:44px;" />
+            <button type="button" @onclick="() => showPwd = !showPwd"
+                    style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);font-size:16px;padding:0;">
+                @(showPwd ? "🙈" : "👁")
+            </button>
+        </div>
+    </div>
+
+    <button class="btn btn-primary btn-lg w-full" style="margin-top:4px;">
+        Đăng nhập
+    </button>
+
+</form>
+
+<div style="text-align:center;margin-top:18px;font-size:13px;color:var(--text-3);">
+    Chưa có tài khoản?
+    <a href="/register" class="fw-700 text-brand">Đăng ký ngay</a>
+</div>
+
+<details style="margin-top:20px;">
+    <summary style="font-size:11.5px;color:var(--text-3);cursor:pointer;user-select:none;">
+        🔑 Tài khoản demo
+    </summary>
+    <div style="background:var(--surface-2);border-radius:var(--radius-sm);padding:10px 14px;margin-top:8px;font-size:11.5px;font-family:'JetBrains Mono',monospace;line-height:2;color:var(--text-2);border:1px solid var(--border);">
+        admin@local / Admin123$<br />
+        staff@local / Staff123$<br />
+        customer@local / Customer123$<br />
+        vip@local / Vip1234$
+    </div>
+</details>
+
+@code {
+    string? error;
+    bool showPwd;
+
+    protected override void OnInitialized()
+    {
+        var q = Microsoft.AspNetCore.WebUtilities.QueryHelpers
+            .ParseQuery(Nav.ToAbsoluteUri(Nav.Uri).Query);
+        if (!q.TryGetValue("error", out var e)) return;
+        error = e.ToString() switch
+        {
+            "blocked"         => "Tài khoản không tồn tại hoặc đã bị khóa.",
+            "bad_credentials" => "Sai email hoặc mật khẩu.",
+            _                 => "Đăng nhập thất bại."
+        };
+    }
+}

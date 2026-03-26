@@ -1,0 +1,365 @@
+@page "/staff/chat"
+@attribute [Authorize(Roles = "Admin,Staff")]
+@using MiniShopee.Models
+@using Microsoft.JSInterop
+@inject MiniShopee.Services.CommerceService CommerceService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@implements IAsyncDisposable
+
+<PageTitle>Hộp thư tư vấn - MiniShopee</PageTitle>
+
+<div class="page-header-row mb-4">
+    <div class="page-header" style="margin-bottom:0">
+        <div class="page-title">📬 Hộp thư tư vấn</div>
+        <div class="page-sub">Phản hồi real-time qua SignalR</div>
+    </div>
+    <span class="badge @(hubConnected ? "badge-green" : "badge-gray")" style="gap:6px;padding:5px 12px;">
+        <span class="signal-dot @(hubConnected ? "online" : "offline")"></span>
+        @(hubConnected ? "SignalR kết nối" : "Đang kết nối...")
+    </span>
+</div>
+
+<div style="display:grid;grid-template-columns:290px 1fr;height:calc(100vh - 175px);border:1.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--surface);box-shadow:var(--shadow);">
+
+    <!-- DANH SÁCH KHÁCH -->
+    <div style="border-right:1.5px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;">
+        <div style="padding:13px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:13px;background:var(--surface-2);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+            Khách hàng
+            <span class="badge badge-brand">@inbox.Count</span>
+        </div>
+
+        @if (inbox.Count == 0)
+        {
+            <div class="empty-state" style="padding:32px 16px;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <div class="empty-state-icon" style="font-size:40px;">💬</div>
+                <div class="empty-state-title" style="font-size:14px;">Chưa có tin nhắn</div>
+            </div>
+        }
+
+        @foreach (var item in inbox)
+        {
+            var sel = selectedUserId == item.UserId;
+            <div @onclick="() => SelectUser(item)"
+                 style="padding:13px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;
+                        background:@(sel ? "var(--brand-light)" : "var(--surface)");
+                        border-left:3px solid @(sel ? "var(--brand)" : "transparent");">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="fw-700" style="font-size:13px;">@item.FullName</span>
+                    <span class="text-xs text-muted">@item.SentAt.ToLocalTime().ToString("HH:mm")</span>
+                </div>
+                <div class="text-xs text-muted mb-1">@item.Email</div>
+                <div style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px;
+                            color:@(item.IsReplied ? "var(--text-3)" : "var(--text)");">
+                    @item.LastMsg
+                </div>
+                @if (!item.IsReplied)
+                {
+                    <span class="badge badge-brand mt-1" style="font-size:10px;">● Chờ phản hồi</span>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- KHUNG CHAT -->
+    <div style="display:flex;flex-direction:column;height:100%;min-height:0;">
+
+        @if (selectedUserId == null)
+        {
+            <div class="empty-state" style="margin:auto;">
+                <div class="empty-state-icon">👈</div>
+                <div class="empty-state-title">Chọn khách hàng</div>
+                <div class="empty-state-desc">Chọn từ danh sách bên trái để xem và phản hồi tin nhắn</div>
+            </div>
+        }
+        else
+        {
+            <!-- Header -->
+            <div style="padding:13px 18px;border-bottom:1px solid var(--border);background:var(--surface-2);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">
+                <div class="flex items-center gap-3">
+                    <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--brand),#ff8856);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0;">
+                        @(selectedName.Length > 0 ? selectedName[0].ToString().ToUpper() : "?")
+                    </div>
+                    <div>
+                        <div class="fw-700" style="font-size:14px;">@selectedName</div>
+                        <div class="text-xs text-muted">@selectedEmail</div>
+                    </div>
+                </div>
+                <span class="badge badge-green">● Đang xem</span>
+            </div>
+
+            <!-- Messages — CHỈ hiện tin KH gửi cho nhân viên và tin nhân viên reply, KHÔNG có tin AI -->
+            <div id="staffChatMessages" style="flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px;min-height:0;">
+
+                @if (messages.Count == 0)
+                {
+                    <div class="empty-state" style="margin:auto;">
+                        <div class="empty-state-desc">Chưa có tin nhắn trong hội thoại này</div>
+                    </div>
+                }
+
+                @foreach (var m in messages)
+                {
+                    @if (m.IsFromStaff)
+                    {
+                        <!-- Tin nhân viên: bên phải, màu brand -->
+                        <div style="display:flex;flex-direction:column;align-items:flex-end;">
+                            <div style="font-size:11px;color:var(--text-3);margin-bottom:3px;margin-right:4px;">
+                                🧑‍💼 Bạn
+                            </div>
+                            <div style="max-width:70%;padding:10px 15px;border-radius:18px 18px 4px 18px;font-size:13.5px;line-height:1.55;word-break:break-word;background:var(--brand);color:#fff;">
+                                @m.Content
+                            </div>
+                            <div style="font-size:10.5px;color:var(--text-3);margin-top:3px;margin-right:4px;">
+                                @m.SentAt.ToLocalTime().ToString("HH:mm")
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Tin khách hàng: bên trái, màu xám -->
+                        <div style="display:flex;flex-direction:column;align-items:flex-start;">
+                            <div style="font-size:11px;color:var(--text-3);margin-bottom:3px;margin-left:4px;">
+                                👤 @selectedName
+                            </div>
+                            <div style="max-width:70%;padding:10px 15px;border-radius:18px 18px 18px 4px;font-size:13.5px;line-height:1.55;word-break:break-word;background:var(--surface-2);color:var(--text);">
+                                @m.Content
+                            </div>
+                            <div style="font-size:10.5px;color:var(--text-3);margin-top:3px;margin-left:4px;">
+                                @m.SentAt.ToLocalTime().ToString("HH:mm")
+                            </div>
+                        </div>
+                    }
+                }
+
+            </div>
+
+            <!-- Quick replies -->
+            <div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;background:var(--surface-2);flex-shrink:0;">
+                @foreach (var q in quickReplies)
+                {
+                    var qr = q;
+                    <button class="chip" style="font-size:11.5px;padding:4px 11px;"
+                            @onclick="async () => { replyInput = qr; await Reply(); }">@q</button>
+                }
+            </div>
+
+            <!-- Input -->
+            <div style="padding:12px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;">
+                <input class="form-control" placeholder="Nhập phản hồi..."
+                       value="@replyInput"
+                       @oninput="@(e => { replyInput = e.Value?.ToString() ?? string.Empty; })"
+                       @onkeydown="OnKey"
+                       style="border-radius:22px;padding-left:18px;" />
+                <button class="btn btn-primary" @onclick="Reply"
+                        disabled="@sending"
+                        style="border-radius:50%;width:42px;height:42px;padding:0;flex-shrink:0;">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+                    </svg>
+                </button>
+            </div>
+        }
+
+    </div>
+</div>
+
+@code {
+    List<ChatInboxItem> inbox = [];
+    string? selectedUserId;
+    string selectedName = "", selectedEmail = "";
+    string? staffUserId; // userId của staff/admin đang đăng nhập
+    // CHỈ chứa tin KH gửi nhân viên + tin nhân viên reply — không có tin AI
+    List<ChatMessage> messages = [];
+    string replyInput = "";
+    bool sending;
+    HubConnection? hub;
+    bool hubConnected;
+
+    static readonly string[] quickReplies =
+    {
+        "Xin chào! Tôi có thể giúp gì?",
+        "Cảm ơn bạn đã liên hệ!",
+        "Sản phẩm hiện còn hàng.",
+        "Vui lòng cho biết size và màu.",
+        "Giao hàng trong 2–3 ngày.",
+        "Đổi trả trong 30 ngày.",
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Lấy userId của staff/admin hiện tại để truyền vào hub
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(auth.User);
+        staffUserId = user?.Id;
+
+        inbox = await CommerceService.GetChatInboxAsync();
+
+        // Truyền userId vào query string "uid" — hub đọc trực tiếp
+        var hubUrl = Nav.ToAbsoluteUri($"/hubs/chat?uid={Uri.EscapeDataString(staffUserId ?? "")}");
+        hub = new HubConnectionBuilder()
+            .WithUrl(hubUrl)
+            .WithAutomaticReconnect()
+            .Build();
+
+        // Nhận tin mới từ khách hàng real-time
+        hub.On<object>("NewCustomerMessage", async raw =>
+        {
+            try
+            {
+                var json   = System.Text.Json.JsonSerializer.Serialize(raw);
+                var doc    = System.Text.Json.JsonDocument.Parse(json);
+                var root   = doc.RootElement;
+                var fromId = root.TryGetProperty("userId", out var u) ? u.GetString() : null;
+                var content = root.TryGetProperty("content", out var c) ? c.GetString() ?? "" : "";
+                var sentAt  = root.TryGetProperty("sentAt",  out var s)
+                                ? DateTime.Parse(s.GetString()!) : DateTime.UtcNow;
+
+                // Cập nhật inbox
+                inbox = await CommerceService.GetChatInboxAsync();
+
+                // Nếu đang xem đúng cuộc chat này thì thêm tin vào messages
+                if (fromId == selectedUserId)
+                {
+                    messages.Add(new ChatMessage
+                    {
+                        UserId = fromId!, Content = content,
+                        IsFromStaff = false, IsFromAI = false,
+                        SentAt = sentAt
+                    });
+                    await InvokeAsync(StateHasChanged);
+                    await ScrollBottom();
+                }
+                else
+                {
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch { }
+        });
+
+        // Xác nhận tin nhắn đã gửi (echo từ server)
+        hub.On<object>("ReplyEcho", async raw =>
+        {
+            try
+            {
+                var json    = System.Text.Json.JsonSerializer.Serialize(raw);
+                var doc     = System.Text.Json.JsonDocument.Parse(json);
+                var root    = doc.RootElement;
+                var content = root.TryGetProperty("content", out var c) ? c.GetString() ?? "" : "";
+                var sentAt  = root.TryGetProperty("sentAt",  out var s)
+                                ? DateTime.Parse(s.GetString()!) : DateTime.UtcNow;
+
+                // Cập nhật SentAt của optimistic message
+                var opt = messages.LastOrDefault(m => m.IsFromStaff && m.Id == 0 && m.Content == content);
+                if (opt != null) opt.SentAt = sentAt;
+
+                inbox = await CommerceService.GetChatInboxAsync();
+                await InvokeAsync(StateHasChanged);
+                await ScrollBottom();
+            }
+            catch { }
+        });
+
+        hub.Reconnecting += _ => { hubConnected = false; InvokeAsync(StateHasChanged); return Task.CompletedTask; };
+        hub.Reconnected  += _ => { hubConnected = true;  InvokeAsync(StateHasChanged); return Task.CompletedTask; };
+
+        try
+        {
+            await hub.StartAsync();
+            hubConnected = hub.State == HubConnectionState.Connected;
+        }
+        catch
+        {
+            hubConnected = false;
+        }
+    }
+
+    async Task SelectUser(ChatInboxItem item)
+    {
+        // Báo rời khỏi cuộc chat cũ
+        if (selectedUserId != null && hub != null)
+            try { await hub.SendAsync("StaffLeft", selectedUserId); } catch { }
+
+        selectedUserId = item.UserId;
+        selectedName   = item.FullName;
+        selectedEmail  = item.Email;
+        replyInput     = "";
+
+        // Chỉ lấy tin KH gửi nhân viên + tin nhân viên — lọc bỏ tin AI
+        var all = await CommerceService.GetChatMessagesAsync(item.UserId);
+        messages = all.Where(m => !m.IsFromAI).ToList();
+
+        // Báo đang xem cuộc chat này
+        if (hub != null)
+            try { await hub.SendAsync("StaffViewing", selectedUserId); } catch { }
+
+        StateHasChanged();
+        await ScrollBottom();
+    }
+
+    async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !sending && !string.IsNullOrWhiteSpace(replyInput))
+            await Reply();
+    }
+
+    async Task Reply()
+    {
+        if (string.IsNullOrWhiteSpace(replyInput) || selectedUserId == null || sending) return;
+
+        var text = replyInput.Trim();
+        replyInput = "";
+        sending = true;
+
+        // Optimistic: hiện ngay trong UI
+        messages.Add(new ChatMessage
+        {
+            UserId = selectedUserId, Content = text,
+            IsFromStaff = true, SentAt = DateTime.UtcNow
+        });
+        StateHasChanged();
+        await ScrollBottom();
+
+        try
+        {
+            if (hub != null && hub.State == HubConnectionState.Connected)
+            {
+                await hub.SendAsync("ReplyToUser", selectedUserId, text);
+            }
+            else
+            {
+                var saved = await CommerceService.SendMessageAsync(selectedUserId, text, isFromStaff: true);
+                var opt = messages.LastOrDefault(m => m.IsFromStaff && m.Id == 0 && m.Content == text);
+                if (opt != null) opt.Id = saved.Id;
+                inbox = await CommerceService.GetChatInboxAsync();
+            }
+        }
+        catch
+        {
+            // Xóa optimistic message nếu gửi thất bại
+            var failed = messages.LastOrDefault(m => m.IsFromStaff && m.Id == 0 && m.Content == text);
+            if (failed != null) messages.Remove(failed);
+        }
+        finally
+        {
+            sending = false;
+            StateHasChanged();
+            await ScrollBottom();
+        }
+    }
+
+    async Task ScrollBottom()
+    {
+        try { await JS.InvokeVoidAsync("scrollElementBottom", "staffChatMessages"); } catch { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (selectedUserId != null && hub != null)
+            try { await hub.SendAsync("StaffLeft", selectedUserId); } catch { }
+        if (hub != null) await hub.DisposeAsync();
+    }
+}

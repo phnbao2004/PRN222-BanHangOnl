@@ -1,0 +1,331 @@
+@page "/shop"
+
+@using MiniShopee.Models
+
+@inject MiniShopee.Services.CommerceService CommerceService
+@inject MiniShopee.Services.CartState Cart
+@inject NavigationManager Nav
+
+<PageTitle>Sản phẩm - MiniShopee</PageTitle>
+
+<div class="page-header-row mb-4">
+
+    <div class="page-header" style="margin-bottom:0;">
+        <div class="page-title">Sản phẩm</div>
+        <div class="page-sub">@products.Count kết quả</div>
+    </div>
+
+    <div class="flex gap-2 items-center">
+
+        <select class="form-select"
+                style="width:160px;"
+                @bind="sortBy">
+
+            <option value="">Mặc định</option>
+            <option value="price_asc">Giá tăng dần</option>
+            <option value="price_desc">Giá giảm dần</option>
+            <option value="newest">Mới nhất</option>
+
+        </select>
+
+    </div>
+
+</div>
+
+
+<div class="search-row">
+
+    <div class="search-wrap">
+
+        <svg class="search-icon"
+             width="15"
+             height="15"
+             viewBox="0 0 20 20"
+             fill="currentColor">
+
+            <path fill-rule="evenodd"
+                  d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89
+3.476l4.817 4.817a1 1 0
+01-1.414 1.414l-4.816-4.816A6
+6 0 012 8z"
+                  clip-rule="evenodd" />
+
+        </svg>
+
+        <input class="form-control"
+               placeholder="Tìm kiếm sản phẩm..."
+               value="@search"
+               @oninput="OnSearch" />
+
+    </div>
+
+
+    <div class="filter-chips">
+
+        <span class="chip @(activeCategory == null ? "active" : "")"
+              @onclick="() => SetCat(null)">
+            Tất cả
+        </span>
+
+        @foreach (var c in categories)
+        {
+            <span class="chip @(activeCategory == c ? "active" : "")"
+                  @onclick="() => SetCat(c)">
+                @c
+            </span>
+        }
+
+    </div>
+
+</div>
+
+
+@if (loading)
+{
+
+    <div class="product-grid">
+
+        @for (var i = 0; i < 6; i++)
+        {
+            <div class="card">
+
+                <div class="skeleton"
+                     style="height:190px;"></div>
+
+                <div class="card-body">
+
+                    <div class="skeleton mb-2"
+                         style="height:14px;width:70%;"></div>
+
+                    <div class="skeleton mb-3"
+                         style="height:12px;"></div>
+
+                    <div class="skeleton"
+                         style="height:32px;"></div>
+
+                </div>
+
+            </div>
+        }
+
+    </div>
+
+}
+else if (products.Count == 0)
+{
+
+    <div class="empty-state">
+
+        <div class="empty-state-icon">📦</div>
+
+        <div class="empty-state-title">
+            Không tìm thấy sản phẩm
+        </div>
+
+        <div class="empty-state-desc">
+            Thử thay đổi từ khóa hoặc danh mục lọc
+        </div>
+
+    </div>
+
+}
+else
+{
+
+    <div class="product-grid">
+
+        @foreach (var p in products)
+        {
+
+            <div class="product-card" style="cursor:pointer;" @onclick='() => Nav.NavigateTo($"/product/{p.Id}")'>
+
+                <div class="product-img-wrap">
+
+                    @if (!string.IsNullOrEmpty(p.ImageUrl))
+                    {
+                        <img src="@p.ImageUrl" alt="@p.Name" />
+                    }
+                    else
+                    {
+                        <div class="product-no-img">
+                            Chưa có ảnh
+                        </div>
+                    }
+
+                </div>
+
+
+                <div class="product-body">
+
+                    <div class="product-cat">
+                        @p.Category
+                    </div>
+
+                    <div class="product-name">
+                        @p.Name
+                    </div>
+
+                    <div class="product-desc">
+                        @p.Description
+                    </div>
+
+
+                    <div class="product-footer">
+
+                        <div>
+
+                            <div class="product-price">
+                                @p.PriceVnd.ToString("N0")đ
+                            </div>
+
+                            <div class="product-stock @(p.Stock < 5 ? "stock-low" : "text-muted")">
+                                Còn @p.Stock
+                            </div>
+
+                        </div>
+
+
+                        <AuthorizeView Roles="Customer,VipCustomer">
+
+                            <Authorized>
+
+                                <button class="btn btn-primary btn-sm"
+                                        @onclick="() => Add(p.Id, p.Name)"
+                                        disabled="@(p.Stock == 0)">
+
+                                    @(p.Stock == 0 ? "Hết hàng" : "Thêm vào giỏ")
+
+                                </button>
+
+                            </Authorized>
+
+                            <NotAuthorized>
+
+                                <a class="btn btn-ghost btn-sm"
+                                   href="/login">
+
+                                    Đăng nhập để mua
+
+                                </a>
+
+                            </NotAuthorized>
+
+                        </AuthorizeView>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        }
+
+    </div>
+
+}
+
+@if (addMsg != null)
+{
+    <div class="alert alert-success mt-4">
+        @addMsg
+    </div>
+}
+
+
+@code {
+
+    List<Product> products = [];
+
+    List<string> categories = [];
+
+    string? activeCategory;
+
+    string search = "";
+
+    bool loading = true;
+
+    string _sortBy = "";
+    string sortBy
+    {
+        get => _sortBy;
+        set { _sortBy = value; _ = Load(); }
+    }
+
+    string? addMsg;
+
+    CancellationTokenSource? _cts;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await CommerceService.GetCategoriesAsync();
+
+        await Load();
+
+        loading = false;
+    }
+
+
+
+    async Task OnSearch(ChangeEventArgs e)
+    {
+        search = e.Value?.ToString() ?? "";
+        await Load();
+    }
+
+
+
+    async Task SetCat(string? c)
+    {
+        activeCategory = c;
+        await Load();
+    }
+
+
+
+    async Task Load()
+    {
+
+        loading = true;
+
+        products =
+        await CommerceService.GetProductsAsync(
+        string.IsNullOrWhiteSpace(search) ? null : search,
+        activeCategory,
+        sortBy);
+
+        loading = false;
+
+    }
+
+
+
+    void Add(int id, string name)
+    {
+
+        Cart.Add(id);
+
+        Cart.NotifyChange();
+
+        addMsg = $"Đã thêm \"{name}\" vào giỏ hàng";
+
+        _cts?.Cancel();
+
+        _cts = new CancellationTokenSource();
+
+        var token = _cts.Token;
+
+        _ = Task.Delay(2500, token)
+        .ContinueWith(x =>
+        {
+            if (!x.IsCanceled)
+            {
+                addMsg = null;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+    }
+
+}

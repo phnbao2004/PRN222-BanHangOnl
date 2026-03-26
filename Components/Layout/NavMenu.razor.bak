@@ -1,0 +1,157 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@inject MiniShopee.Services.CartState Cart
+@inject NavigationManager Nav
+@implements IDisposable
+
+<nav class="sidebar">
+    <div class="sidebar-logo">
+        <div class="logo-wordmark">Mini<span>Shopee</span></div>
+        <div class="logo-tagline">Thời trang chất lượng cao</div>
+    </div>
+
+    <div class="sidebar-nav">
+
+        <a class="nav-link @A("/")" href="/">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+            Trang chủ
+        </a>
+
+        <AuthorizeView Context="authMain">
+            <Authorized>
+
+                <AuthorizeView Roles="Customer,VipCustomer" Context="authCust">
+                    <Authorized>
+                        <div class="nav-label">Mua sắm</div>
+                        <a class="nav-link @A("/shop")" href="/shop">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/></svg>
+                            Sản phẩm
+                        </a>
+                        <a class="nav-link @A("/cart")" href="/cart">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3z"/></svg>
+                            Giỏ hàng
+                            @if (Cart.TotalCount > 0) { <span class="nav-badge">@Cart.TotalCount</span> }
+                        </a>
+                        <a class="nav-link @A("/orders")" href="/orders">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                            Đơn hàng
+                        </a>
+                        <a class="nav-link @A("/vouchers-view")" href="/vouchers-view">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm4.707 3.707a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L8.414 9H10a3 3 0 013 3v1a1 1 0 102 0v-1a5 5 0 00-5-5H8.414l1.293-1.293z" clip-rule="evenodd"/></svg>
+                            Voucher
+                        </a>
+                        <a class="nav-link @A("/chat")" href="/chat">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"/></svg>
+                            Tư vấn
+                        </a>
+                    </Authorized>
+                </AuthorizeView>
+
+                <AuthorizeView Roles="Staff" Context="authStaff">
+                    <Authorized>
+                        <div class="nav-label">Quản lý</div>
+                        <a class="nav-link @A("/manage-orders")" href="/manage-orders">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                            Đơn hàng
+                        </a>
+                        <a class="nav-link @A("/staff/customers")" href="/staff/customers">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
+                            Khách hàng
+                        </a>
+                        <a class="nav-link @A("/staff/chat")" href="/staff/chat">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"/><path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z"/></svg>
+                            Hộp thư
+                        </a>
+                        <a class="nav-link @A("/vouchers")" href="/vouchers">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5z" clip-rule="evenodd"/></svg>
+                            Voucher
+                        </a>
+                        <a class="nav-link @A("/reports")" href="/reports">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+                            Báo cáo
+                        </a>
+                    </Authorized>
+                </AuthorizeView>
+
+                <AuthorizeView Roles="Admin" Context="authAdmin">
+                    <Authorized>
+                        <div class="nav-label">Quản lý</div>
+                        <a class="nav-link @A("/manage-orders")" href="/manage-orders">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                            Đơn hàng
+                        </a>
+                        <a class="nav-link @A("/staff/customers")" href="/staff/customers">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
+                            Khách hàng
+                        </a>
+                        <a class="nav-link @A("/staff/chat")" href="/staff/chat">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"/><path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z"/></svg>
+                            Hộp thư
+                        </a>
+                        <a class="nav-link @A("/vouchers")" href="/vouchers">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5z" clip-rule="evenodd"/></svg>
+                            Voucher
+                        </a>
+                        <a class="nav-link @A("/reports")" href="/reports">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+                            Báo cáo
+                        </a>
+                        <div class="nav-label">Quản trị</div>
+                        <a class="nav-link @A("/admin/products")" href="/admin/products">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4zm-6 3a1 1 0 112 0 1 1 0 01-2 0zm7-1a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd"/></svg>
+                            Sản phẩm
+                        </a>
+                        <a class="nav-link @A("/admin/users")" href="/admin/users">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clip-rule="evenodd"/></svg>
+                            Phân quyền
+                        </a>
+                    </Authorized>
+                </AuthorizeView>
+
+                <div class="nav-label">Tài khoản</div>
+                <a class="nav-link @A("/profile")" href="/profile">
+                    <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+                    Hồ sơ
+                </a>
+
+            </Authorized>
+            <NotAuthorized>
+                <div class="nav-label">Tài khoản</div>
+                <a class="nav-link @A("/login")" href="/login">
+                    <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                    Đăng nhập
+                </a>
+                <a class="nav-link @A("/register")" href="/register">
+                    <svg viewBox="0 0 20 20" fill="currentColor"><path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z"/></svg>
+                    Đăng ký
+                </a>
+            </NotAuthorized>
+        </AuthorizeView>
+
+    </div>
+
+    <div class="sidebar-footer">
+        <AuthorizeView>
+            <Authorized>
+                <form method="post" action="/auth/logout-form">
+                    <button class="logout-btn">
+                        <svg viewBox="0 0 20 20" fill="currentColor" style="width:15px;height:15px;vertical-align:middle;margin-right:6px;opacity:.7;"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"/></svg>
+                        Đăng xuất
+                    </button>
+                </form>
+            </Authorized>
+        </AuthorizeView>
+    </div>
+</nav>
+
+@code {
+    private string A(string href)
+    {
+        var uri = Nav.Uri;
+        if (href == "/")
+            return (uri == Nav.BaseUri || uri.TrimEnd('/') == Nav.BaseUri.TrimEnd('/')) ? "active" : "";
+        return uri.Contains(href) ? "active" : "";
+    }
+
+    protected override void OnInitialized() => Cart.OnChange += StateHasChanged;
+    public void Dispose() => Cart.OnChange -= StateHasChanged;
+}

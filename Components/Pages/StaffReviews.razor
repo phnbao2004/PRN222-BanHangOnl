@@ -1,0 +1,104 @@
+@page "/staff/reviews"
+@attribute [Authorize(Roles = "Admin,Staff")]
+@using MiniShopee.Models
+@inject MiniShopee.Services.CommerceService CommerceService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Quản lý đánh giá - MiniShopee</PageTitle>
+
+<div class="page-header-row mb-4">
+    <div class="page-header" style="margin-bottom:0;">
+        <div class="page-title">⭐ Quản lý đánh giá</div>
+        <div class="page-sub">@reported.Count đánh giá bị báo cáo</div>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(msg))
+{
+    <div class="alert alert-success mb-4">✅ @msg</div>
+}
+
+@if (reported.Count == 0)
+{
+    <div class="empty-state">
+        <div class="empty-state-icon">✅</div>
+        <div class="empty-state-title">Không có đánh giá bị báo cáo</div>
+        <div class="empty-state-desc">Tất cả đánh giá đang ổn</div>
+    </div>
+}
+else
+{
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr><th>Sản phẩm</th><th>Người dùng</th><th>Sao</th><th>Nội dung</th><th>Ngày</th><th>Hành động</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var r in reported)
+                {
+                    <tr style="background:#fffbeb;">
+                        <td>
+                            <div class="fw-600 text-sm">@r.Product?.Name</div>
+                            <div class="text-muted text-xs">#@r.ProductId</div>
+                        </td>
+                        <td>
+                            <div class="fw-600 text-sm">@r.User?.FullName</div>
+                            <div class="text-muted text-xs">@r.User?.Email</div>
+                        </td>
+                        <td>
+                            <div style="display:flex;gap:2px;">
+                                @for (int i = 1; i <= 5; i++)
+                                { <svg width="13" height="13" fill="@(i<=r.Stars?"#f59e0b":"#e2e8f0")" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg> }
+                            </div>
+                        </td>
+                        <td style="max-width:220px;">
+                            <div style="font-size:12.5px;color:var(--text-2);white-space:normal;">@r.Comment</div>
+                        </td>
+                        <td class="mono text-sm">@r.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                        <td>
+                            <div style="display:flex;gap:6px;">
+                                @if (isAdmin)
+                                {
+                                    <button class="btn btn-danger btn-sm" @onclick="() => Delete(r.Id)">🗑 Xóa</button>
+                                    <button class="btn btn-ghost btn-sm" @onclick="() => Dismiss(r.Id)">✓ Bỏ qua</button>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-yellow">⚠️ Đã báo cáo Admin</span>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    List<ProductReview> reported = [];
+    bool isAdmin;
+    string msg = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        isAdmin = auth.User.IsInRole("Admin");
+        reported = await CommerceService.GetAllReportedReviewsAsync();
+    }
+
+    async Task Delete(int id)
+    {
+        await CommerceService.DeleteReviewAsync(id);
+        reported = await CommerceService.GetAllReportedReviewsAsync();
+        msg = "Đã xóa đánh giá.";
+    }
+
+    async Task Dismiss(int id)
+    {
+        // Ẩn báo cáo bằng cách hide đánh giá
+        await CommerceService.HideReviewAsync(id);
+        reported = await CommerceService.GetAllReportedReviewsAsync();
+        msg = "Đã ẩn đánh giá.";
+    }
+}

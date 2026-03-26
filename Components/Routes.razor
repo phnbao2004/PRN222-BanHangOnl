@@ -1,0 +1,13 @@
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <NotAuthorized>
+                <MiniShopee.Components.Layout.AuthLayout>
+                    <div class="auth-title">Không có quyền truy cập</div>
+                    <div class="auth-sub">Vui lòng đăng nhập để tiếp tục</div>
+                    <a href="/login" class="btn btn-primary btn-block btn-lg" style="margin-top:16px;">Đăng nhập</a>
+                </MiniShopee.Components.Layout.AuthLayout>
+            </NotAuthorized>
+        </AuthorizeRouteView>
+    </Found>
+</Router>

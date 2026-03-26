@@ -1,0 +1,342 @@
+@page "/cart"
+@attribute [Authorize(Roles = "Customer,VipCustomer")]
+@using MiniShopee.Models
+@inject MiniShopee.Services.CartState CartState
+@inject MiniShopee.Services.CommerceService CommerceService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Giỏ hàng - MiniShopee</PageTitle>
+
+<div class="page-header">
+    <div class="page-title">Giỏ hàng</div>
+    <div class="page-sub">@CartState.TotalCount sản phẩm</div>
+</div>
+
+@if (!CartState.Items.Any())
+{
+    <div class="empty-state">
+        <div class="empty-state-icon">🛒</div>
+        <div class="empty-state-title">Giỏ hàng trống</div>
+        <div class="empty-state-desc mb-4">Hãy thêm sản phẩm từ trang cửa hàng</div>
+        <a class="btn btn-primary" href="/shop">Tiếp tục mua sắm</a>
+    </div>
+}
+else
+{
+    <div class="cart-layout">
+
+        <!-- CART ITEMS -->
+        <div class="card">
+            <div class="card-head">
+                Sản phẩm đã chọn
+                <button class="btn btn-ghost btn-sm" style="color:var(--red);" @onclick="Clear">Xóa tất cả</button>
+            </div>
+            <div class="card-body">
+                @foreach (var item in rows)
+                {
+                    <div class="cart-item" style="display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);">
+                        @if (!string.IsNullOrEmpty(item.Product.ImageUrl))
+                        { <img class="cart-thumb" src="@item.Product.ImageUrl" alt="@item.Product.Name" /> }
+                        else
+                        { <div class="cart-thumb-placeholder">N/A</div> }
+
+                        <div class="cart-info">
+                            <div class="cart-name">@item.Product.Name</div>
+                            <div class="cart-unit">@item.Product.PriceVnd.ToString("N0")đ / cái</div>
+                        </div>
+
+                        <div class="qty-ctrl">
+                            <button class="qty-btn" @onclick="() => Dec(item.ProductId)">−</button>
+                            <span class="qty-num">@item.Qty</span>
+                            <button class="qty-btn" @onclick="() => Inc(item.ProductId)">+</button>
+                        </div>
+
+                        <div class="cart-subtotal">@((item.Product.PriceVnd * item.Qty).ToString("N0"))đ</div>
+                        <button class="cart-remove" title="Xóa" @onclick="() => Remove(item.ProductId)">✕</button>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- SUMMARY -->
+        <div>
+
+            <!-- THÔNG TIN GIAO HÀNG -->
+            <div class="card mb-3">
+                <div class="card-head">📍 Thông tin giao hàng</div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label class="form-label">Tên người nhận *</label>
+                        <input class="form-control" @bind="receiverName" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Số điện thoại *</label>
+                        <input class="form-control" @bind="receiverPhone" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Địa chỉ giao hàng *</label>
+                        <input class="form-control" @bind="shippingAddress" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- VOUCHER -->
+            <div class="card mb-3">
+                <div class="card-head">🎟️ Mã giảm giá & Freeship</div>
+                <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+
+                    @if (discountVouchers.Count == 0 && freeshipVouchers.Count == 0)
+                    {
+                        <div class="text-muted text-sm">Không có voucher khả dụng</div>
+                    }
+
+                    <!-- Slot 1: Mã giảm giá -->
+                    @if (discountVouchers.Count > 0)
+                    {
+                        <div>
+                            <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
+                                💸 Mã giảm giá
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:6px;">
+                                <div @onclick="() => selectedDiscount = null"
+                                     style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:8px;
+                                            border:1.5px solid @(selectedDiscount == null ? "var(--brand)" : "var(--border)");
+                                            background:@(selectedDiscount == null ? "var(--brand-light)" : "var(--surface)");cursor:pointer;">
+                                    <span style="font-size:12.5px;color:var(--text-3);">Không dùng</span>
+                                    @if (selectedDiscount == null)
+                                    { <span style="color:var(--brand);font-size:12px;font-weight:700;">✓</span> }
+                                </div>
+                                @foreach (var v in discountVouchers)
+                                {
+                                    var dv = v;
+                                    var eligible = subtotal >= dv.MinOrderVnd;
+                                    <div @onclick="() => { if(eligible) selectedDiscount = dv; }"
+                                         style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:8px;
+                                                border:1.5px solid @(selectedDiscount?.Id == dv.Id ? "var(--brand)" : eligible ? "var(--border)" : "var(--border)");
+                                                background:@(selectedDiscount?.Id == dv.Id ? "var(--brand-light)" : "var(--surface)");
+                                                cursor:@(eligible ? "pointer" : "not-allowed");
+                                                opacity:@(eligible ? "1" : "0.5");">
+                                        <div>
+                                            <div style="font-family:monospace;font-weight:700;font-size:13px;letter-spacing:1px;">@dv.Code</div>
+                                            <div style="font-size:11.5px;color:var(--text-3);">
+                                                @dv.Description
+                                                @if (!eligible)
+                                                { <span style="color:#dc2626;"> — Cần đơn @dv.MinOrderVnd.ToString("N0")đ</span> }
+                                            </div>
+                                        </div>
+                                        <div style="font-weight:800;font-size:14px;color:var(--brand);white-space:nowrap;margin-left:10px;">
+                                            @(dv.Type == VoucherType.Percent ? $"-{dv.DiscountPercent}%" : $"-{dv.DiscountAmount:N0}đ")
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Slot 2: Mã freeship -->
+                    @if (freeshipVouchers.Count > 0)
+                    {
+                        <div>
+                            <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
+                                🚚 Mã miễn phí vận chuyển
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:6px;">
+                                <div @onclick="() => selectedFreeship = null"
+                                     style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:8px;
+                                            border:1.5px solid @(selectedFreeship == null ? "#16a34a" : "var(--border)");
+                                            background:@(selectedFreeship == null ? "#f0fdf4" : "var(--surface)");cursor:pointer;">
+                                    <span style="font-size:12.5px;color:var(--text-3);">Không dùng</span>
+                                    @if (selectedFreeship == null)
+                                    { <span style="color:#16a34a;font-size:12px;font-weight:700;">✓</span> }
+                                </div>
+                                @foreach (var v in freeshipVouchers)
+                                {
+                                    var fv = v;
+                                    var eligible = subtotal >= fv.MinOrderVnd;
+                                    <div @onclick="() => { if(eligible) selectedFreeship = fv; }"
+                                         style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:8px;
+                                                border:1.5px solid @(selectedFreeship?.Id == fv.Id ? "#16a34a" : "var(--border)");
+                                                background:@(selectedFreeship?.Id == fv.Id ? "#f0fdf4" : "var(--surface)");
+                                                cursor:@(eligible ? "pointer" : "not-allowed");
+                                                opacity:@(eligible ? "1" : "0.5");">
+                                        <div>
+                                            <div style="font-family:monospace;font-weight:700;font-size:13px;letter-spacing:1px;">@fv.Code</div>
+                                            <div style="font-size:11.5px;color:var(--text-3);">
+                                                @fv.Description
+                                                @if (!eligible)
+                                                { <span style="color:#dc2626;"> — Cần đơn @fv.MinOrderVnd.ToString("N0")đ</span> }
+                                            </div>
+                                        </div>
+                                        <div style="font-weight:800;font-size:14px;color:#16a34a;white-space:nowrap;margin-left:10px;">
+                                            Freeship
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- TỔNG TIỀN -->
+            <div class="card">
+                <div class="card-body">
+
+                    <!-- Tiền hàng -->
+                    <div class="flex justify-between mb-3">
+                        <span style="color:var(--text-2);">Tiền hàng</span>
+                        <span class="mono">@subtotal.ToString("N0")đ</span>
+                    </div>
+
+                    <!-- Phí vận chuyển -->
+                    <div class="flex justify-between mb-3">
+                        <span style="color:var(--text-2);">
+                            🚚 Phí vận chuyển
+                            <span style="font-size:11px;color:var(--text-3);display:block;">
+                                @(subtotal < 200_000 ? "Đơn dưới 200k" : subtotal < 500_000 ? "Đơn 200k–500k" : "Đơn trên 500k")
+                            </span>
+                        </span>
+                        <span class="mono @(freeshipAmt >= shipFee ? "text-green" : "")">
+                            @if (freeshipAmt >= shipFee)
+                            { <s style="color:var(--text-3);font-size:11px;">@shipFee.ToString("N0")đ</s> <span> 0đ</span> }
+                            else if (freeshipAmt > 0)
+                            { <span>@((shipFee - freeshipAmt).ToString("N0"))đ</span> }
+                            else
+                            { <span>@shipFee.ToString("N0")đ</span> }
+                        </span>
+                    </div>
+
+                    <!-- Giảm giá voucher -->
+                    @if (discountAmt > 0)
+                    {
+                        <div class="flex justify-between mb-3" style="color:#16a34a;">
+                            <span>
+                                🏷️ Mã giảm giá
+                                <span style="font-family:monospace;font-size:11px;background:#dcfce7;color:#166534;padding:1px 6px;border-radius:4px;margin-left:4px;">@selectedDiscount!.Code</span>
+                            </span>
+                            <span class="mono">-@discountAmt.ToString("N0")đ</span>
+                        </div>
+                    }
+
+                    <!-- Freeship voucher -->
+                    @if (freeshipAmt > 0)
+                    {
+                        <div class="flex justify-between mb-3" style="color:#16a34a;">
+                            <span>
+                                🚚 Mã freeship
+                                <span style="font-family:monospace;font-size:11px;background:#dcfce7;color:#166534;padding:1px 6px;border-radius:4px;margin-left:4px;">@selectedFreeship!.Code</span>
+                            </span>
+                            <span class="mono">-@Math.Min(freeshipAmt, shipFee).ToString("N0")đ</span>
+                        </div>
+                    }
+
+                    <div class="divider"></div>
+
+                    <div class="flex justify-between fw-700" style="font-size:17px;">
+                        <span>Tổng thanh toán</span>
+                        <span class="mono text-brand">@finalTotal.ToString("N0")đ</span>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(error))
+                    {
+                        <div class="alert alert-danger mt-3">@error</div>
+                    }
+
+                    <button class="btn btn-primary btn-block btn-lg mt-4"
+                            disabled="@ordering" @onclick="Checkout">
+                        @(ordering ? "Đang xử lý..." : "Đặt hàng")
+                    </button>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(successMsg))
+{
+    <div class="alert alert-success mt-4">@successMsg</div>
+}
+
+@code {
+    class Row { public int ProductId; public Product Product = new(); public int Qty; }
+
+    List<Row> rows = [];
+    List<Product> allProducts = [];
+
+    List<Voucher> discountVouchers  = [];   // Percent + Fixed
+    List<Voucher> freeshipVouchers  = [];   // Freeship
+    Voucher? selectedDiscount;
+    Voucher? selectedFreeship;
+
+    string receiverName = "", receiverPhone = "", shippingAddress = "";
+    string error = "", successMsg = "";
+    bool ordering;
+
+    double subtotal   => rows.Sum(r => r.Product.PriceVnd * r.Qty);
+    double shipFee    => CommerceService.CalcShipFee(subtotal);
+
+    double discountAmt => selectedDiscount switch {
+        { Type: VoucherType.Percent } => Math.Round(subtotal * selectedDiscount.DiscountPercent / 100),
+        { Type: VoucherType.Fixed }   => Math.Min(selectedDiscount.DiscountAmount, subtotal),
+        _ => 0
+    };
+
+    double freeshipAmt => selectedFreeship?.ShipAmount ?? 0;
+
+    double finalTotal => subtotal - discountAmt + Math.Max(0, shipFee - freeshipAmt);
+
+    protected override async Task OnInitializedAsync()
+    {
+        allProducts = await CommerceService.GetProductsAsync();
+        Rebuild();
+
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(auth.User);
+        if (user != null)
+        {
+            receiverName    = user.FullName;
+            receiverPhone   = user.DefaultPhone;
+            shippingAddress = user.DefaultAddress;
+
+            var isVip = await UserManager.IsInRoleAsync(user, "VipCustomer") || user.TotalSpentVnd >= 1_000_000;
+            var all   = await CommerceService.GetVouchersAsync(isVip, user.Id);
+
+            discountVouchers  = all.Where(v => v.Type != VoucherType.Freeship).ToList();
+            freeshipVouchers  = all.Where(v => v.Type == VoucherType.Freeship).ToList();
+        }
+    }
+
+    void Rebuild() => rows = CartState.Items
+        .Select(kv => new Row { ProductId = kv.Key, Product = allProducts.FirstOrDefault(p => p.Id == kv.Key) ?? new(), Qty = kv.Value })
+        .Where(r => r.Product.Id != 0).ToList();
+
+    void Inc(int id)    { CartState.Add(id);       CartState.NotifyChange(); Rebuild(); }
+    void Dec(int id)    { CartState.Remove(id);    CartState.NotifyChange(); Rebuild(); }
+    void Remove(int id) { CartState.RemoveAll(id); CartState.NotifyChange(); Rebuild(); }
+    void Clear()        { CartState.Clear();        CartState.NotifyChange(); Rebuild(); }
+
+    async Task Checkout()
+    {
+        error = "";
+        if (!CartState.Items.Any()) { error = "Giỏ hàng trống."; return; }
+        ordering = true;
+
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(auth.User);
+        if (user == null) { error = "Không tìm thấy tài khoản."; ordering = false; return; }
+
+        var (order, err) = await CommerceService.PlaceOrderAsync(
+            user, CartState.Items, shippingAddress, receiverName, receiverPhone,
+            selectedDiscount?.Code, selectedFreeship?.Code);
+
+        if (order == null) { error = err; ordering = false; return; }
+
+        CartState.Clear(); CartState.NotifyChange(); Rebuild();
+        successMsg = $"✅ Đặt hàng thành công! Mã đơn #{order.Id} — Tổng: {order.TotalVnd:N0}đ (ship: {order.ShipFeeVnd:N0}đ)";
+        selectedDiscount = null; selectedFreeship = null;
+        ordering = false;
+    }
+}

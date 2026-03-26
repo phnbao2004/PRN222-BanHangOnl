@@ -1,0 +1,120 @@
+@page "/vouchers-view"
+@attribute [Authorize(Roles = "Customer,VipCustomer")]
+@using MiniShopee.Models
+@inject MiniShopee.Services.CommerceService CommerceService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Voucher của tôi - MiniShopee</PageTitle>
+
+<div class="page-header-row mb-4">
+    <div class="page-header" style="margin-bottom:0;">
+        <div class="page-title">🎟️ Voucher của tôi</div>
+        <div class="page-sub">@vouchers.Count voucher khả dụng</div>
+    </div>
+</div>
+
+@if (vouchers.Count == 0)
+{
+    <div class="empty-state">
+        <div class="empty-state-icon">🎟️</div>
+        <div class="empty-state-title">Chưa có voucher khả dụng</div>
+        <div class="empty-state-desc">Hãy quay lại sau để nhận ưu đãi từ MiniShopee</div>
+    </div>
+}
+else
+{
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;">
+        @foreach (var v in vouchers)
+        {
+            var (typeIcon, typeLabel, typeColor, valueTxt) = v.Type switch {
+                VoucherType.Percent  => ("💸", "Giảm giá", "var(--brand)", $"Giảm {v.DiscountPercent}%"),
+                VoucherType.Fixed    => ("🏷️", "Giảm tiền", "#7c3aed", $"Giảm {v.DiscountAmount:N0}đ"),
+                VoucherType.Freeship => ("🚚", "Freeship", "#16a34a", "Miễn phí vận chuyển"),
+                _ => ("🎟️","","","")
+            };
+            var userUsed = userUsageMap.GetValueOrDefault(v.Id, 0);
+            var remainUser = v.MaxUsesPerUser - userUsed;
+            var remainTotal = v.MaxUsesTotal > 0 ? v.MaxUsesTotal - v.UsedCount : (int?)null;
+
+            <div style="background:var(--surface);border-radius:var(--radius-lg);border:1.5px solid @(v.VipOnly ? "#fde68a" : "var(--border)");overflow:hidden;box-shadow:var(--shadow-sm);">
+                <!-- Top strip -->
+                <div style="background:@typeColor;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;">
+                    <div>
+                        <div style="font-size:11px;color:rgba(255,255,255,.8);font-weight:600;letter-spacing:.5px;text-transform:uppercase;">@typeLabel</div>
+                        <div style="font-size:26px;font-weight:800;color:#fff;line-height:1.1;margin-top:2px;">@valueTxt</div>
+                    </div>
+                    <div style="font-size:36px;opacity:.9;">@typeIcon</div>
+                </div>
+
+                <!-- Body -->
+                <div style="padding:14px 18px;">
+                    <div style="font-family:monospace;font-size:15px;font-weight:800;letter-spacing:2px;color:var(--text);margin-bottom:6px;display:flex;align-items:center;gap:8px;">
+                        @v.Code
+                        @if (v.VipOnly) { <span class="badge badge-yellow" style="font-size:10px;">👑 VIP</span> }
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(v.Description))
+                    {
+                        <div style="font-size:12.5px;color:var(--text-2);margin-bottom:10px;">@v.Description</div>
+                    }
+
+                    <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px;">
+                        @if (v.MinOrderVnd > 0)
+                        {
+                            <div style="font-size:12px;color:var(--text-3);">🛒 Đơn hàng tối thiểu <strong>@v.MinOrderVnd.ToString("N0")đ</strong></div>
+                        }
+                        <div style="font-size:12px;color:var(--text-3);">📅 HSD: <strong>@v.ExpiredAt.ToLocalTime().ToString("dd/MM/yyyy")</strong></div>
+                        <div style="font-size:12px;color:var(--text-3);">
+                            🔢 Lượt dùng còn lại của bạn: <strong style="color:@(remainUser <= 1 ? "var(--danger)" : "var(--text)");">@remainUser</strong>/@v.MaxUsesPerUser
+                        </div>
+                        @if (remainTotal.HasValue)
+                        {
+                            <div style="font-size:12px;color:var(--text-3);">
+                                📊 Còn lại: <strong>@remainTotal</strong>/@v.MaxUsesTotal lượt
+                                <div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden;">
+                                    <div style="height:100%;width:@(Math.Max(0,100*remainTotal.Value/v.MaxUsesTotal))%;background:@typeColor;border-radius:2px;transition:.3s;"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <button class="btn btn-secondary" style="width:100%;font-size:12.5px;"
+                            @onclick="() => CopyCode(v.Code)">
+                        @(copiedCode == v.Code ? "✅ Đã sao chép!" : "📋 Sao chép mã")
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    List<Voucher> vouchers = [];
+    Dictionary<int, int> userUsageMap = [];
+    string? copiedCode;
+    string? userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(auth.User);
+        if (user == null) return;
+        userId = user.Id;
+
+        var isVip = auth.User.IsInRole("VipCustomer");
+        vouchers = await CommerceService.GetVouchersAsync(isVip, userId);
+
+        // Lấy số lần đã dùng của user cho từng voucher
+        userUsageMap = await CommerceService.GetUserVoucherUsagesAsync(userId);
+    }
+
+    async Task CopyCode(string code)
+    {
+        copiedCode = code;
+        StateHasChanged();
+        await Task.Delay(2000);
+        copiedCode = null;
+        StateHasChanged();
+    }
+}

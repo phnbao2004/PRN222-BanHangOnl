@@ -1,0 +1,314 @@
+@page "/admin/users"
+@attribute [Authorize(Roles = "Admin,Staff")]
+@using MiniShopee.Models
+@inject UserManager<ApplicationUser> UserManager
+@inject MiniShopee.Services.UserGovernanceService Governance
+@inject MiniShopee.Services.CommerceService CommerceService
+
+<PageTitle>Người dùng - MiniShopee</PageTitle>
+
+<div class="page-header-row mb-4">
+    <div class="page-header" style="margin-bottom:0">
+        <div class="page-title">👥 Quản lý người dùng</div>
+        <div class="page-sub">@users.Count tài khoản</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+        <select class="form-select" style="width:150px;" @bind="filterRole">
+            <option value="">Tất cả</option>
+            <option value="Customer">Khách hàng</option>
+            <option value="VipCustomer">VIP</option>
+            <option value="Staff">Staff</option>
+        </select>
+        <div class="search-wrap" style="max-width:240px">
+            <svg class="search-icon" width="15" height="15" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+            </svg>
+            <input class="form-control" placeholder="Tìm email hoặc tên..."
+                   value="@search" @oninput="OnSearch" />
+        </div>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(msg))
+{
+    <div class="alert @(msgOk?"alert-success":"alert-danger") mb-4">@(msgOk?"✅":"❌") @msg</div>
+}
+
+<!-- Thống kê tổng quan -->
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px;">
+    <div class="card" style="padding:14px 18px;">
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:4px;">Tổng tài khoản</div>
+        <div style="font-size:22px;font-weight:800;">@users.Count</div>
+    </div>
+    <div class="card" style="padding:14px 18px;">
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:4px;">👑 VIP</div>
+        <div style="font-size:22px;font-weight:800;color:#f59e0b;">@users.Count(u => u.TotalSpentVnd >= 1_000_000 && !u.IsBlocked)</div>
+    </div>
+    <div class="card" style="padding:14px 18px;">
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:4px;">⚠️ Bị cảnh báo</div>
+        <div style="font-size:22px;font-weight:800;color:#f97316;">@users.Count(u => u.WarningLevel == 1 || u.WarningLevel == 2)</div>
+    </div>
+    <div class="card" style="padding:14px 18px;">
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:4px;">🔒 Bị khóa</div>
+        <div style="font-size:22px;font-weight:800;color:var(--danger);">@users.Count(u => u.IsBlocked)</div>
+    </div>
+    <div class="card" style="padding:14px 18px;">
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:4px;">📦 Đơn hoàn</div>
+        <div style="font-size:22px;font-weight:800;color:#7c3aed;">@returnedCount</div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;">
+    @foreach (var (t, label, count, color) in new[]{
+        ("all",    "Tất cả",     filtered.Count,                                                     "var(--text)"),
+        ("warn",   "⚠️ Cảnh báo", filtered.Count(u => u.WarningLevel >= 1 && !u.IsBlocked),          "#f97316"),
+        ("blocked","🔒 Bị khóa", filtered.Count(u => u.IsBlocked),                                  "var(--danger)"),
+        ("return", "🔄 Hoàn nhiều", filtered.Count(u => returnMap.GetValueOrDefault(u.Id,0) >= 2),  "#7c3aed"),
+    })
+    {
+        var tab = t;
+        <button @onclick="() => activeTab = tab"
+                style="padding:10px 20px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:@(activeTab==tab?"700":"500");
+                       color:@(activeTab==tab ? color : "var(--text-3)");
+                       border-bottom:@(activeTab==tab ? $"3px solid {color}" : "3px solid transparent");
+                       margin-bottom:-2px;transition:.12s;">
+            @label
+            <span style="margin-left:6px;background:@(activeTab==tab?color:"var(--border)");color:@(activeTab==tab?"#fff":"var(--text-3)");
+                         padding:1px 7px;border-radius:20px;font-size:11px;font-weight:700;">@count</span>
+        </button>
+    }
+</div>
+
+<!-- Bảng người dùng -->
+<div class="table-wrap">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Người dùng</th>
+                <th>Vai trò</th>
+                <th>Chi tiêu</th>
+                <th>Hủy / Hoàn</th>
+                <th>Uy tín</th>
+                <th>Cảnh báo</th>
+                <th>Trạng thái</th>
+                <th>Hành động</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var u in TabFiltered)
+            {
+                var returnCount  = returnMap.GetValueOrDefault(u.Id, 0);
+                var cancelCount  = cancelMap.GetValueOrDefault(u.Id, 0);
+                var isStaff      = roleMap.GetValueOrDefault(u.Id, "Customer") == "Staff";
+                var riskColor    = u.WarningLevel switch { 3 => "#fee2e2", 2 => "#fff7ed", 1 => "#fefce8", _ => "transparent" };
+                var repColor     = u.ReputationPoints >= 7 ? "badge-green" : u.ReputationPoints >= 4 ? "badge-yellow" : "badge-red";
+
+                <tr style="background:@riskColor;transition:.15s;">
+                    <td>
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--brand),#ff8856);
+                                        display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:14px;flex-shrink:0;">
+                                @((u.FullName ?? "?")[0])
+                            </div>
+                            <div>
+                                <div class="fw-600">
+                                    @u.FullName
+                                    @if (u.WarningLevel == 1) { <span title="Cảnh báo lần 1">⚠️</span> }
+                                    @if (u.WarningLevel == 2) { <span title="Cảnh báo nghiêm trọng">🔴</span> }
+                                    @if (u.WarningLevel >= 3) { <span title="Bị khóa tự động">🔒</span> }
+                                </div>
+                                <div class="text-muted text-xs">@u.Email</div>
+                            </div>
+                        </div>
+                    </td>
+
+                    <td>
+                        @if (isStaff)
+                        { <span class="badge badge-brand">🧑‍💼 Staff</span> }
+                        else if (u.TotalSpentVnd >= 1_000_000)
+                        { <span class="badge badge-yellow">👑 VIP</span> }
+                        else
+                        { <span class="badge badge-gray">👤 Khách</span> }
+                    </td>
+
+                    <td class="mono text-sm">@u.TotalSpentVnd.ToString("N0")đ</td>
+
+                    <td>
+                        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                            @if (cancelCount > 0)
+                            {
+                                <span class="badge @(cancelCount >= 5 ? "badge-red" : cancelCount >= 3 ? "badge-yellow" : "badge-gray")">
+                                    ✕ @cancelCount hủy
+                                </span>
+                            }
+                            @if (returnCount > 0)
+                            {
+                                <span class="badge @(returnCount >= 3 ? "badge-red" : returnCount >= 1 ? "badge-yellow" : "badge-gray")">
+                                    🔄 @returnCount hoàn
+                                </span>
+                            }
+                            @if (cancelCount == 0 && returnCount == 0)
+                            { <span style="color:var(--text-3);">—</span> }
+                        </div>
+                    </td>
+
+                    <td>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <div style="width:60px;height:6px;border-radius:3px;background:var(--border);overflow:hidden;">
+                                <div style="height:100%;width:@(u.ReputationPoints*10)%;background:@(u.ReputationPoints>=7?"#16a34a":u.ReputationPoints>=4?"#f59e0b":"#ef4444");border-radius:3px;transition:.3s;"></div>
+                            </div>
+                            <span class="badge @repColor" style="font-size:10px;">@u.ReputationPoints/10</span>
+                        </div>
+                    </td>
+
+                    <td>
+                        @if (u.WarningLevel == 0)
+                        {
+                            <span style="color:var(--text-3);font-size:12px;">—</span>
+                        }
+                        else
+                        {
+                            <div>
+                                <div style="display:flex;gap:4px;margin-bottom:4px;">
+                                    @for (int i = 1; i <= 3; i++)
+                                    {
+                                        int level = i;
+                                        <div style="width:20px;height:20px;border-radius:4px;background:@(u.WarningLevel>=level ? (level==3?"#ef4444":level==2?"#f97316":"#eab308") : "var(--border)");"></div>
+                                    }
+                                </div>
+                                @if (!string.IsNullOrEmpty(u.LastWarningReason))
+                                {
+                                    <div style="font-size:10.5px;color:var(--text-3);max-width:160px;white-space:normal;line-height:1.3;">
+                                        @u.LastWarningReason
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </td>
+
+                    <td>
+                        @if (u.IsBlocked)
+                        { <span class="badge badge-red">🔒 Bị khóa</span> }
+                        else
+                        { <span class="badge badge-green">● Hoạt động</span> }
+                    </td>
+
+                    <td>
+                        <div class="flex gap-2" style="flex-wrap:wrap;">
+                            @if (!u.IsBlocked && !isStaff)
+                            {
+                                @if (u.WarningLevel > 0)
+                                {
+                                    <button class="btn btn-success btn-sm" @onclick="() => ResetWarn(u.Id)" title="Xóa 1 mức cảnh báo, +2 uy tín">
+                                        ✅ Tha lỗi
+                                    </button>
+                                }
+                                <button class="btn btn-danger btn-sm" @onclick="() => WarnUser(u.Id)" title="Cảnh báo thủ công -1 uy tín">
+                                    ⚠️ Phạt
+                                </button>
+                                @if (!isStaff)
+                                {
+                                    <button class="btn btn-secondary btn-sm" @onclick="() => SetStaff(u.Id)">🧑‍💼</button>
+                                }
+                                <button class="btn btn-danger btn-sm" @onclick="() => Block(u.Id)">🔒</button>
+                            }
+                            else if (u.IsBlocked)
+                            {
+                                <button class="btn btn-success btn-sm" @onclick="() => Unblock(u.Id)">🔓 Mở khóa</button>
+                            }
+                            else if (isStaff)
+                            {
+                                <button class="btn btn-ghost btn-sm" @onclick="() => RemoveStaff(u.Id)">↩ Hủy Staff</button>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    List<ApplicationUser> users = [];
+    List<ApplicationUser> filtered = [];
+    Dictionary<string, string> roleMap   = [];
+    Dictionary<string, int>    returnMap = [];
+    Dictionary<string, int>    cancelMap = [];
+    int returnedCount;
+
+    string search = ""; string msg = ""; bool msgOk;
+    string activeTab = "all";
+
+    string _filterRole = "";
+    string filterRole { get => _filterRole; set { _filterRole = value; ApplyFilter(); } }
+
+    IEnumerable<ApplicationUser> TabFiltered => activeTab switch {
+        "warn"    => filtered.Where(u => u.WarningLevel >= 1 && !u.IsBlocked),
+        "blocked" => filtered.Where(u => u.IsBlocked),
+        "return"  => filtered.Where(u => returnMap.GetValueOrDefault(u.Id,0) >= 2),
+        _         => filtered
+    };
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    async Task Reload()
+    {
+        var allUsers = await Task.Run(() => UserManager.Users.OrderBy(u => u.Email).ToList());
+        roleMap = [];
+        foreach (var u in allUsers)
+        {
+            var roles = await UserManager.GetRolesAsync(u);
+            // Bỏ qua mọi tài khoản có role Admin (kể cả Admin kiêm Customer/Staff)
+            if (roles.Contains("Admin")) continue;
+            roleMap[u.Id] = roles.Contains("Staff") ? "Staff"
+                          : roles.Contains("VipCustomer") ? "VipCustomer"
+                          : "Customer";
+        }
+        // Chỉ hiện user không phải Admin
+        users = allUsers.Where(u => roleMap.ContainsKey(u.Id)).ToList();
+
+        var allOrders = await CommerceService.GetAllOrdersAsync();
+        returnMap = allOrders.Where(o => o.Status == "Returned")
+            .GroupBy(o => o.UserId).ToDictionary(g => g.Key, g => g.Count());
+        cancelMap = allOrders.Where(o => o.Status == "Cancelled")
+            .GroupBy(o => o.UserId).ToDictionary(g => g.Key, g => g.Count());
+        returnedCount = await CommerceService.GetReturnedOrderCountAsync();
+        ApplyFilter();
+    }
+
+    void OnSearch(ChangeEventArgs e) { search = e.Value?.ToString() ?? ""; ApplyFilter(); }
+
+    void ApplyFilter()
+    {
+        var q = users.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(search))
+            q = q.Where(u => (u.Email ?? "").Contains(search, StringComparison.OrdinalIgnoreCase)
+                          || (u.FullName ?? "").Contains(search, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(_filterRole))
+            q = q.Where(u => roleMap.GetValueOrDefault(u.Id) == _filterRole);
+        filtered = q.ToList();
+    }
+
+    async Task SetStaff(string id)
+    { await Governance.AssignStaffAsync(id); msg = "Đã cấp quyền Staff."; msgOk = true; await Reload(); }
+
+    async Task RemoveStaff(string id)
+    {
+        var u = await UserManager.FindByIdAsync(id);
+        if (u != null) { await UserManager.RemoveFromRoleAsync(u, "Staff"); await UserManager.AddToRoleAsync(u, "Customer"); }
+        msg = "Đã hủy quyền Staff."; msgOk = true; await Reload();
+    }
+
+    async Task WarnUser(string id)
+    { await Governance.ReportUserAsync(id, "Cảnh báo thủ công bởi Admin/Staff"); msg = "Đã cảnh báo."; msgOk = true; await Reload(); }
+
+    async Task ResetWarn(string id)
+    { await Governance.ResetWarningAsync(id); msg = "Đã tha lỗi và +2 uy tín."; msgOk = true; await Reload(); }
+
+    async Task Block(string id)
+    { await Governance.ReportUserAsync(id, "Khóa thủ công bởi Admin/Staff"); msg = "Đã khóa tài khoản."; msgOk = true; await Reload(); }
+
+    async Task Unblock(string id)
+    { await Governance.UnblockUserAsync(id); msg = "Đã mở khóa tài khoản."; msgOk = true; await Reload(); }
+}

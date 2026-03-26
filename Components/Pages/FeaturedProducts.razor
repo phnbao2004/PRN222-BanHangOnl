@@ -1,0 +1,90 @@
+@using MiniShopee.Models
+@using Microsoft.AspNetCore.Components.Authorization
+@inject MiniShopee.Services.CommerceService CommerceService
+@inject MiniShopee.Services.CartState Cart
+@inject NavigationManager Nav
+
+@if (loading)
+{
+    <div class="product-grid">
+        @for (var i = 0; i < 4; i++)
+        {
+            <div class="card">
+                <div class="skeleton" style="height:180px;"></div>
+                <div class="card-body">
+                    <div class="skeleton mb-2" style="height:14px;width:70%;"></div>
+                    <div class="skeleton" style="height:12px;"></div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="product-grid">
+        @foreach (var p in products.Take(4))
+        {
+            var pid = p.Id;
+            <div class="product-card" style="cursor:pointer;" @onclick="() => GoToProduct(pid)">
+                <div class="product-img-wrap">
+                    @if (!string.IsNullOrEmpty(p.ImageUrl))
+                    { <img src="@p.ImageUrl" alt="@p.Name" /> }
+                    else
+                    { <div class="product-no-img">Chưa có ảnh</div> }
+                </div>
+                <div class="product-body">
+                    <div class="product-cat">@p.Category</div>
+                    <div class="product-name">@p.Name</div>
+                    <div class="product-footer">
+                        <div class="product-price">@p.PriceVnd.ToString("N0")đ</div>
+                        <AuthorizeView Roles="Customer,VipCustomer">
+                            <Authorized>
+                                <button class="btn btn-primary btn-sm"
+                                        @onclick:stopPropagation="true"
+                                        @onclick="() => Add(p.Id)"
+                                        disabled="@(p.Stock == 0)">
+                                    🛒 Thêm
+                                </button>
+                            </Authorized>
+                            <NotAuthorized>
+                                <a class="btn btn-ghost btn-sm" href="/login"
+                                   @onclick:stopPropagation="true">Mua</a>
+                            </NotAuthorized>
+                        </AuthorizeView>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div style="margin-top:16px;text-align:center;">
+        <a href="/shop" class="btn btn-secondary">Xem tất cả sản phẩm</a>
+    </div>
+}
+
+@if (msg != null)
+{
+    <div class="alert alert-success mt-3">@msg</div>
+}
+
+@code {
+    private List<Product> products = new();
+    private bool loading = true;
+    private string? msg;
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = await CommerceService.GetProductsAsync();
+        loading = false;
+    }
+
+    private void GoToProduct(int id) => Nav.NavigateTo("/product/" + id);
+
+    private void Add(int id)
+    {
+        Cart.Add(id);
+        Cart.NotifyChange();
+        msg = "✅ Đã thêm vào giỏ hàng";
+        _ = Task.Delay(2000).ContinueWith(_ => { msg = null; InvokeAsync(StateHasChanged); });
+    }
+}

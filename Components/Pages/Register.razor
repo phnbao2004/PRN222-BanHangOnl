@@ -1,0 +1,84 @@
+@page "/register"
+@layout MiniShopee.Components.Layout.AuthLayout
+@inject NavigationManager Nav
+
+<PageTitle>Đăng ký - MiniShopee</PageTitle>
+
+<div class="auth-title">Tạo tài khoản</div>
+<div class="auth-sub">Tham gia MiniShopee ngay hôm nay 🎉</div>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger mb-4">⚠️ @error</div>
+}
+
+<form method="post" action="/auth/register-form" style="display:flex;flex-direction:column;gap:14px;">
+
+    <div class="form-group">
+        <label class="form-label">Họ và tên</label>
+        <input class="form-control" name="fullName"
+               placeholder="Nguyễn Văn A" required autofocus />
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-control" type="email" name="email"
+               placeholder="ban@email.com" required />
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Mật khẩu</label>
+        <div style="position:relative;">
+            <input class="form-control" type="@(showPwd?"text":"password")" name="password"
+                   placeholder="••••••••" required style="padding-right:44px;" />
+            <button type="button" @onclick="() => showPwd = !showPwd"
+                    style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);font-size:16px;padding:0;">
+                @(showPwd ? "🙈" : "👁")
+            </button>
+        </div>
+        <span class="form-hint">Tối thiểu 8 ký tự, có chữ hoa, thường, số và ký tự đặc biệt</span>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Nhập lại mật khẩu</label>
+        <div style="position:relative;">
+            <input class="form-control" type="@(showConfirm?"text":"password")" name="confirmPassword"
+                   placeholder="••••••••" required style="padding-right:44px;" />
+            <button type="button" @onclick="() => showConfirm = !showConfirm"
+                    style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);font-size:16px;padding:0;">
+                @(showConfirm ? "🙈" : "👁")
+            </button>
+        </div>
+    </div>
+
+    <button class="btn btn-primary btn-lg w-full" style="margin-top:4px;">
+        Tạo tài khoản
+    </button>
+
+</form>
+
+<div style="text-align:center;margin-top:18px;font-size:13px;color:var(--text-3);">
+    Đã có tài khoản?
+    <a href="/login" class="fw-700 text-brand">Đăng nhập</a>
+</div>
+
+@code {
+    string? error;
+    bool showPwd;
+    bool showConfirm;
+
+    protected override void OnInitialized()
+    {
+        var q = Microsoft.AspNetCore.WebUtilities.QueryHelpers
+            .ParseQuery(Nav.ToAbsoluteUri(Nav.Uri).Query);
+        if (!q.TryGetValue("error", out var e)) return;
+        error = e.ToString() switch
+        {
+            "missing_fields"   => "Vui lòng nhập đầy đủ thông tin.",
+            "password_mismatch"=> "Mật khẩu nhập lại không khớp.",
+            "email_exists"     => "Email này đã được sử dụng.",
+            "invalid_password" => "Mật khẩu không đúng định dạng yêu cầu.",
+            _                  => "Đăng ký thất bại."
+        };
+    }
+}

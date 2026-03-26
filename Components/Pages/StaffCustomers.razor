@@ -1,0 +1,280 @@
+@page "/staff/customers"
+@attribute [Authorize(Roles = "Admin,Staff")]
+
+@using MiniShopee.Models
+
+@inject UserManager<ApplicationUser> UserManager
+@inject MiniShopee.Services.UserGovernanceService Governance
+
+<PageTitle>Khách hàng - MiniShopee</PageTitle>
+
+<div class="page-header-row mb-4">
+
+    <div class="page-header" style="margin-bottom:0;">
+        <div class="page-title">Quản lý khách hàng</div>
+        <div class="page-sub">@filtered.Count khách hàng</div>
+    </div>
+
+    <div class="search-wrap" style="max-width:280px;">
+
+        <svg class="search-icon"
+             width="15"
+             height="15"
+             viewBox="0 0 20 20"
+             fill="currentColor">
+
+            <path fill-rule="evenodd"
+                  d="M8 4a4 4 0 100 8 4 4 0
+000-8zM2 8a6 6 0 1110.89
+3.476l4.817 4.817a1 1 0
+01-1.414 1.414l-4.816-4.816A6
+6 0 012 8z"
+                  clip-rule="evenodd" />
+
+        </svg>
+
+        <input class="form-control"
+               placeholder="Tìm tên hoặc email..."
+               value="@search"
+               @oninput="OnSearch" />
+
+    </div>
+
+</div>
+
+
+@if (!string.IsNullOrEmpty(msg))
+{
+    <div class="alert @(msgOk ? "alert-success" : "alert-danger") mb-4">
+        @msg
+    </div>
+}
+
+
+<div class="table-wrap">
+
+    <table class="table">
+
+        <thead>
+            <tr>
+                <th>Khách hàng</th>
+                <th>Điện thoại</th>
+                <th>Chi tiêu</th>
+                <th>Uy tín</th>
+                <th>Trạng thái</th>
+                <th>Hành động</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            @foreach (var u in filtered)
+            {
+
+                <tr>
+
+                    <td>
+                        <div class="fw-600">@u.FullName</div>
+                        <div class="text-muted text-xs">@u.Email</div>
+                    </td>
+
+                    <td class="text-sm">
+                        @(string.IsNullOrEmpty(u.DefaultPhone) ? "—" : u.DefaultPhone)
+                    </td>
+
+                    <td class="mono text-sm fw-600">
+                        @u.TotalSpentVnd.ToString("N0")đ
+                    </td>
+
+
+                    <td>
+
+                        @if (u.ReputationPoints >= 7)
+                        {
+                            <span class="badge badge-green">@u.ReputationPoints/10</span>
+                        }
+                        else if (u.ReputationPoints >= 4)
+                        {
+                            <span class="badge badge-yellow">@u.ReputationPoints/10</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-red">@u.ReputationPoints/10</span>
+                        }
+
+                    </td>
+
+
+                    <td>
+
+                        @if (u.IsBlocked)
+                        {
+                            <span class="badge badge-red">Bị khóa</span>
+                        }
+                        else if (u.TotalSpentVnd >= 1_000_000)
+                        {
+                            <span class="badge badge-yellow">VIP</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-green">Bình thường</span>
+                        }
+
+                    </td>
+
+
+                    <td>
+
+                        <div class="flex gap-2">
+
+                            <a class="btn btn-secondary btn-sm"
+                               href="/staff/chat">
+                                Nhắn tin
+                            </a>
+
+                            @if (!u.IsBlocked && u.FraudReports > 0)
+                            {
+                                <button class="btn btn-ghost btn-sm"
+                                        style="color:var(--red);"
+                                        @onclick="() => Report(u.Id)">
+                                    Báo cáo
+                                </button>
+                            }
+
+                            @if (u.IsBlocked)
+                            {
+                                <button class="btn btn-success btn-sm"
+                                        @onclick="() => Unblock(u.Id)">
+                                    Mở khóa
+                                </button>
+                            }
+
+                        </div>
+
+                    </td>
+
+                </tr>
+
+            }
+
+        </tbody>
+
+    </table>
+
+</div>
+
+
+@code {
+
+    List<ApplicationUser> users = [];
+
+    List<ApplicationUser> filtered = [];
+
+    string search = "";
+
+    string msg = "";
+
+    bool msgOk;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+    }
+
+
+
+    async Task Reload()
+    {
+
+        var allUsers = UserManager.Users
+        .OrderByDescending(u => u.TotalSpentVnd)
+        .ToList();
+
+        var customers = new List<ApplicationUser>();
+
+        foreach (var u in allUsers)
+        {
+
+            var roles = await UserManager.GetRolesAsync(u);
+
+            if (roles.Contains("Customer") ||
+            roles.Contains("VipCustomer"))
+            {
+                customers.Add(u);
+            }
+
+        }
+
+        users = customers;
+
+        ApplyFilter();
+
+    }
+
+
+
+    void OnSearch(ChangeEventArgs e)
+    {
+        search = e.Value?.ToString()?.Trim() ?? "";
+        ApplyFilter();
+    }
+
+
+
+    void ApplyFilter()
+    {
+
+        if (string.IsNullOrWhiteSpace(search))
+        {
+            filtered = users.ToList();
+        }
+        else
+        {
+
+            filtered = users
+            .Where(u =>
+            (u.Email ?? "")
+            .Contains(search, StringComparison.OrdinalIgnoreCase)
+            ||
+            (u.FullName ?? "")
+            .Contains(search, StringComparison.OrdinalIgnoreCase)
+            )
+            .ToList();
+
+        }
+
+    }
+
+
+
+    async Task Report(string id)
+    {
+
+        await Governance.ReportUserAsync(id, "Staff review");
+
+        msg = "Đã ghi nhận báo cáo.";
+
+        msgOk = true;
+
+        await Reload();
+
+    }
+
+
+
+    async Task Unblock(string id)
+    {
+
+        await Governance.UnblockUserAsync(id);
+
+        msg = "Đã mở khóa tài khoản.";
+
+        msgOk = true;
+
+        await Reload();
+
+    }
+
+}

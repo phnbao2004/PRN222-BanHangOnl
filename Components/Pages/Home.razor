@@ -1,0 +1,81 @@
+@page "/"
+@page "/home"
+
+<PageTitle>MiniShopee - Thời trang chất lượng</PageTitle>
+
+<!-- HERO -->
+<div style="background:linear-gradient(135deg,var(--brand) 0%,#ff8856 100%);border-radius:var(--radius-lg);padding:48px 40px;margin-bottom:32px;display:grid;grid-template-columns:1fr auto;gap:24px;align-items:center;overflow:hidden;position:relative;">
+    <div style="position:absolute;right:0;top:0;bottom:0;width:40%;background:radial-gradient(circle at 70% 30%, rgba(255,255,255,.12) 0%, transparent 60%), radial-gradient(circle at 30% 80%, rgba(255,255,255,.08) 0%, transparent 50%);pointer-events:none;"></div>
+    <div style="z-index:1;">
+        <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.2);color:#fff;font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;margin-bottom:16px;">
+            🔥 Flash Sale hôm nay
+        </div>
+        <div style="font-size:clamp(24px,4vw,40px);font-weight:800;color:#fff;line-height:1.2;margin-bottom:12px;">
+            Thời trang cao cấp<br/>giá tốt nhất thị trường
+        </div>
+        <div style="font-size:15px;color:rgba(255,255,255,.85);margin-bottom:24px;max-width:420px;line-height:1.6;">
+            Hàng chính hãng · Giao 2–3 ngày toàn quốc · Đổi trả miễn phí 30 ngày
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <a href="/shop" class="btn btn-lg" style="background:#fff;color:var(--brand);font-weight:700;">🛍️ Mua sắm ngay</a>
+            <a href="/shop" class="btn btn-lg" style="background:rgba(255,255,255,.2);color:#fff;border:1.5px solid rgba(255,255,255,.5);">Xem tất cả</a>
+        </div>
+    </div>
+    <div style="z-index:1;font-size:clamp(60px,10vw,120px);filter:drop-shadow(0 8px 24px rgba(0,0,0,.2));user-select:none;">👗</div>
+</div>
+
+<!-- STATS BAR -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:36px;">
+    @foreach (var (icon,num,label) in new[]{("🚚","FREE","Ship toàn quốc"),("🔄","30","Ngày đổi trả"),("✅","100%","Hàng chính hãng"),("💬","24/7","Hỗ trợ khách hàng")})
+    {
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 16px;text-align:center;">
+            <div style="font-size:24px;margin-bottom:6px;">@icon</div>
+            <div style="font-size:18px;font-weight:800;color:var(--brand);">@num</div>
+            <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;">@label</div>
+        </div>
+    }
+</div>
+
+<!-- CATEGORIES -->
+<div style="margin-bottom:36px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div style="font-size:20px;font-weight:800;">🗂️ Danh mục nổi bật</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;">
+        @foreach (var (cat,icon,color) in new[]{("Áo thun","👕","#dbeafe"),("Áo polo","🎽","#dcfce7"),("Áo sơ mi","👔","#fce7f3"),("Áo hoodie","🧥","#ede9fe"),("Áo khoác","🥼","#fef3c7")})
+        {
+            <a href="/shop" style="background:@color;border-radius:var(--radius-lg);padding:20px 12px;text-align:center;text-decoration:none;transition:.15s;display:block;" >
+                <div style="font-size:32px;margin-bottom:8px;">@icon</div>
+                <div style="font-size:13px;font-weight:600;color:var(--text);">@cat</div>
+            </a>
+        }
+    </div>
+</div>
+
+<!-- FEATURED PRODUCTS -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div style="font-size:20px;font-weight:800;">⭐ Sản phẩm nổi bật</div>
+    <a href="/shop" style="font-size:13px;color:var(--brand);font-weight:600;text-decoration:none;">Xem tất cả →</a>
+</div>
+
+<FeaturedProducts />
+
+<!-- PROMO BANNER -->
+<div style="margin-top:36px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div style="background:linear-gradient(135deg,#1e293b,#334155);border-radius:var(--radius-lg);padding:28px 24px;display:flex;align-items:center;gap:20px;">
+        <div style="font-size:48px;">🎁</div>
+        <div>
+            <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:6px;">Ưu đãi thành viên VIP</div>
+            <div style="font-size:13px;color:#94a3b8;margin-bottom:14px;">Chi tiêu 1.000.000đ nhận ngay đặc quyền VIP</div>
+            <a href="/shop" class="btn btn-sm" style="background:var(--brand);color:#fff;">Mua ngay</a>
+        </div>
+    </div>
+    <div style="background:linear-gradient(135deg,#7c3aed,#a855f7);border-radius:var(--radius-lg);padding:28px 24px;display:flex;align-items:center;gap:20px;">
+        <div style="font-size:48px;">🎟️</div>
+        <div>
+            <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:6px;">Voucher miễn phí</div>
+            <div style="font-size:13px;color:rgba(255,255,255,.75);margin-bottom:14px;">Dùng mã FREESHIP cho đơn từ 150k</div>
+            <a href="/vouchers-view" class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);">Xem voucher</a>
+        </div>
+    </div>
+</div>

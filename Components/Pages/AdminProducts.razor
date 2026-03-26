@@ -1,0 +1,282 @@
+@page "/admin/products"
+@attribute [Authorize(Roles = "Admin")]
+@using MiniShopee.Models
+@inject MiniShopee.Services.CommerceService CommerceService
+
+<PageTitle>Quản lý sản phẩm - MiniShopee</PageTitle>
+
+<div class="page-header-row mb-5">
+    <div class="page-header" style="margin-bottom:0">
+        <div class="page-title">Quản lý sản phẩm</div>
+        <div class="page-sub">@products.Count sản phẩm trong kho</div>
+    </div>
+    <button class="btn btn-primary" @onclick="New">
+        <svg width="14" height="14" fill="none" viewBox="0 0 20 20"><path fill="currentColor" fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+        Thêm sản phẩm
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(msg))
+{
+    <div class="alert @(msgOk ? "alert-success" : "alert-danger") mb-4">
+        @if (msgOk) { <span>✅</span> } else { <span>❌</span> }
+        @msg
+    </div>
+}
+
+@if (editing != null)
+{
+    <div class="card mb-5">
+        <div class="card-head">
+            @(editing.Id == 0 ? "✨ Thêm sản phẩm mới" : $" Chỉnh sửa: {editing.Name}")
+        </div>
+        <div class="card-body">
+
+            <div class="form-row mb-4">
+                <div class="form-group">
+                    <label class="form-label">Tên sản phẩm *</label>
+                    <input class="form-control" @bind="editing.Name" placeholder="Nhập tên..." />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Danh mục</label>
+                    <input class="form-control" list="cats" @bind="editing.Category" placeholder="Áo thun..." />
+                    <datalist id="cats">@foreach (var c in cats){<option value="@c"/>}</datalist>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Giá (VND)</label>
+                    <input class="form-control" type="number" @bind="editing.PriceVnd" placeholder="299000" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tồn kho</label>
+                    <input class="form-control" type="number" @bind="editing.Stock" placeholder="50" />
+                </div>
+            </div>
+
+            <div class="form-group mb-4">
+                <label class="form-label">Mô tả</label>
+                <textarea class="form-control" @bind="editing.Description" placeholder="Mô tả ngắn về sản phẩm..."></textarea>
+            </div>
+
+            <div class="form-group mb-4">
+                <label class="form-label">Size có sẵn</label>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+                    @foreach (var s in new[]{"S","M","L","XL","XXL","Free Size"})
+                    {
+                        var size = s;
+                        var selected = (editing.AvailableSizes ?? "").Split(',').Select(x=>x.Trim()).Contains(size);
+                        <button type="button"
+                                @onclick="() => ToggleSize(size)"
+                                style="padding:6px 16px;border-radius:8px;border:2px solid @(selected ? "var(--brand)" : "var(--border)");
+                                       background:@(selected ? "var(--brand-light)" : "var(--surface)");
+                                       color:@(selected ? "var(--brand)" : "var(--text)");
+                                       font-weight:@(selected ? "700" : "500");cursor:pointer;font-size:13px;">
+                            @size
+                        </button>
+                    }
+                </div>
+                <span class="form-hint">Click để chọn/bỏ chọn. Đang chọn: @(string.IsNullOrEmpty(editing.AvailableSizes) ? "Chưa chọn" : editing.AvailableSizes)</span>
+            </div>
+
+            <!-- Image section -->
+            <div class="form-group mb-4">
+                <label class="form-label">Hình ảnh sản phẩm</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;">
+
+                    <!-- Preview -->
+                    <div>
+                        @if (!string.IsNullOrEmpty(editing.ImageUrl))
+                        {
+                            <div class="img-preview-wrap">
+                                <img src="@editing.ImageUrl" alt="Preview" />
+                                <div class="img-preview-overlay">
+                                    <button class="btn btn-danger btn-sm" @onclick='() => editing.ImageUrl = ""'>🗑 Xóa ảnh</button>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div style="height:180px;border-radius:var(--radius);background:var(--surface-2);border:2px dashed var(--border-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+                                <span style="font-size:40px;">🖼️</span>
+                                <span style="font-size:12px;color:var(--text-3);font-weight:500;">Chưa có hình ảnh</span>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Controls -->
+                    <div style="display:flex;flex-direction:column;gap:14px;">
+                        <div class="form-group">
+                            <label class="form-label">Dán URL ảnh</label>
+                            <input class="form-control" @bind="editing.ImageUrl" @bind:event="oninput"
+                                   placeholder="https://example.com/photo.jpg" />
+                            <span class="form-hint">Preview tự động khi nhập URL hợp lệ</span>
+                        </div>
+
+                        <div style="display:flex;align-items:center;gap:10px;color:var(--text-3);font-size:12px;">
+                            <div style="flex:1;height:1px;background:var(--border);"></div>
+                            hoặc
+                            <div style="flex:1;height:1px;background:var(--border);"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Upload từ máy tính</label>
+                            <label class="img-upload-zone" style="margin:0;">
+                                <div class="img-upload-icon">📁</div>
+                                <div class="img-upload-text">Chọn file ảnh</div>
+                                <div class="img-upload-hint">PNG, JPG, WEBP — tối đa 5MB</div>
+                                <InputFile OnChange="HandleFileUpload" accept="image/*"
+                                           style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;" />
+                            </label>
+                            @if (!string.IsNullOrEmpty(uploadError))
+                            {
+                                <span class="form-hint" style="color:var(--red);">@uploadError</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <button class="btn btn-primary" @onclick="Save" disabled="@saving">
+                    @(saving ? "⏳ Đang lưu..." : "💾 Lưu sản phẩm")
+                </button>
+                <button class="btn btn-ghost" @onclick="Cancel">Hủy</button>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="table-wrap">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Sản phẩm</th><th>Danh mục</th><th>Giá</th><th>Tồn kho</th><th>Trạng thái</th><th>Hành động</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in products)
+            {
+                <tr style="@(!p.IsActive ? "opacity:.4;" : "")">
+                    <td>
+                        <div class="flex items-center gap-3">
+                            @if (!string.IsNullOrEmpty(p.ImageUrl))
+                            {
+                                <img src="@p.ImageUrl" style="width:48px;height:48px;border-radius:var(--radius-sm);object-fit:cover;border:1px solid var(--border);flex-shrink:0;" />
+                            }
+                            else
+                            {
+                                <div style="width:48px;height:48px;border-radius:var(--radius-sm);background:var(--surface-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">👕</div>
+                            }
+                            <div style="min-width:0;">
+                                <div class="fw-700">@p.Name</div>
+                                <div class="text-xs text-muted truncate" style="max-width:180px;">@p.Description</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="badge badge-brand">@p.Category</span></td>
+                    <td class="mono fw-700 text-brand">@p.PriceVnd.ToString("N0")đ</td>
+                    <td>
+                        @if (p.Stock == 0)
+                        { <span class="badge badge-red">Hết hàng</span> }
+                        else if (p.Stock < 5)
+                        { <span class="badge badge-yellow">⚠ @p.Stock</span> }
+                        else
+                        { <span class="badge badge-green">@p.Stock</span> }
+                    </td>
+                    <td>
+                        @if (p.IsActive)
+                        { <span class="badge badge-green">● Đang bán</span> }
+                        else
+                        { <span class="badge badge-gray">● Đã ẩn</span> }
+                    </td>
+                    <td>
+                        <div class="flex gap-2">
+                            <button class="btn btn-secondary btn-sm" @onclick="() => Edit(p)">✏️ Sửa</button>
+                            <button class="btn @(p.IsActive ? "btn-ghost" : "btn-success") btn-sm" @onclick="() => Toggle(p.Id)">
+                                @(p.IsActive ? "🙈 Ẩn" : "👁 Hiện")
+                            </button>
+                            <button class="btn btn-danger btn-sm" @onclick="() => Del(p.Id)">🗑</button>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    List<Product> products = [];
+    List<string> cats = [];
+    Product? editing;
+    string msg = ""; bool msgOk; bool saving;
+    string uploadError = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = await CommerceService.GetAllProductsAdminAsync();
+        cats = await CommerceService.GetCategoriesAsync();
+    }
+
+    void ToggleSize(string size)
+    {
+        if (editing == null) return;
+        var sizes = (editing.AvailableSizes ?? "").Split(',').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x)).ToList();
+        if (sizes.Contains(size)) sizes.Remove(size);
+        else sizes.Add(size);
+        editing.AvailableSizes = string.Join(",", sizes);
+    }
+
+    void New() => editing = new Product { Category = "Áo thun", AvailableSizes = "S,M,L,XL" };
+    void Cancel() => editing = null;
+
+    void Edit(Product p) => editing = new Product
+    {
+        Id = p.Id, Name = p.Name, Description = p.Description,
+        Category = p.Category, PriceVnd = p.PriceVnd,
+        Stock = p.Stock, ImageUrl = p.ImageUrl, IsActive = p.IsActive, AvailableSizes = p.AvailableSizes
+    };
+
+    async Task HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        uploadError = "";
+        var file = e.File;
+        if (editing == null || file == null) return;
+
+        const long maxSize = 5 * 1024 * 1024;
+        if (file.Size > maxSize) { uploadError = "File quá lớn (tối đa 5MB)."; return; }
+
+        var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
+        if (!allowed.Contains(Path.GetExtension(file.Name).ToLower()))
+        { uploadError = "Định dạng không hỗ trợ. Dùng JPG, PNG, WEBP."; return; }
+
+        using var ms = new MemoryStream();
+        using var stream = file.OpenReadStream(maxSize);
+        await stream.CopyToAsync(ms);
+        editing.ImageUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(ms.ToArray())}";
+    }
+
+    async Task Save()
+    {
+        if (editing == null || string.IsNullOrWhiteSpace(editing.Name))
+        { msg = "Vui lòng nhập tên sản phẩm."; msgOk = false; return; }
+
+        saving = true;
+        await CommerceService.UpsertProductAsync(editing);
+        msg = $"Đã lưu \"{editing.Name}\" thành công!"; msgOk = true;
+        editing = null; saving = false;
+        products = await CommerceService.GetAllProductsAdminAsync();
+        cats = await CommerceService.GetCategoriesAsync();
+    }
+
+    async Task Toggle(int id)
+    {
+        await CommerceService.ToggleProductActiveAsync(id);
+        products = await CommerceService.GetAllProductsAdminAsync();
+    }
+
+    async Task Del(int id)
+    {
+        await CommerceService.DeleteProductAsync(id);
+        msg = "Đã xóa sản phẩm."; msgOk = true;
+        products = await CommerceService.GetAllProductsAdminAsync();
+    }
+}

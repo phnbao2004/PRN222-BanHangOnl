@@ -1,0 +1,260 @@
+@page "/staff/inbox"
+@attribute [Authorize(Roles = "Admin,Staff")]
+
+@using MiniShopee.Models
+@using Microsoft.AspNetCore.Components.Web
+
+@inject MiniShopee.Services.CommerceService CommerceService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject UserManager<ApplicationUser> UserManager
+
+<PageTitle>Hộp thư - MiniShopee</PageTitle>
+
+<div class="page-header">
+    <div class="page-title">Tin nhắn khách hàng</div>
+    <div class="page-sub">Trả lời tư vấn từ khách</div>
+</div>
+
+<div style="display:grid;grid-template-columns:280px 1fr;height:calc(100vh - 150px);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface);">
+
+    @* Danh sách khách *@
+    <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;">
+
+        <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;color:var(--text-2);">
+            Hội thoại (@inbox.Count)
+        </div>
+
+        <div style="flex:1;overflow-y:auto;">
+
+            @if (inbox.Count == 0)
+            {
+                <div class="empty-state" style="padding:24px;">
+                    <div class="empty-state-icon">💬</div>
+                    <div class="empty-state-title">Chưa có tin nhắn</div>
+                </div>
+            }
+
+            @foreach (var item in inbox)
+            {
+                <div @onclick="() => SelectUser(item.UserId)"
+                     style="padding:12px 14px;cursor:pointer;border-bottom:1px solid var(--border);
+    background:@(selectedUserId == item.UserId ? "var(--brand-light)" : "transparent");">
+
+                    <div class="flex justify-between items-center mb-1">
+
+                        <span class="fw-600 text-sm">
+                            @item.FullName
+                        </span>
+
+                        <span class="text-xs text-muted">
+                            @item.SentAt.ToLocalTime().ToString("HH:mm")
+                        </span>
+
+                    </div>
+
+                    <div class="text-xs text-muted truncate">
+                        @item.LastMsg
+                    </div>
+
+                    @if (!item.IsReplied)
+                    {
+                        <div style="width:7px;height:7px;border-radius:50%;background:var(--brand);margin-top:4px;"></div>
+                    }
+
+                </div>
+            }
+
+        </div>
+
+    </div>
+
+
+    @* Khung chat *@
+    <div style="display:flex;flex-direction:column;height:100%;">
+
+        @if (selectedUserId == null)
+        {
+
+            <div class="empty-state" style="margin:auto;">
+                <div class="empty-state-icon">💬</div>
+                <div class="empty-state-title">Chọn một hội thoại</div>
+                <div class="empty-state-desc">để xem và trả lời tin nhắn</div>
+            </div>
+
+        }
+        else
+        {
+
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface-2);">
+
+                <div class="fw-600">@selectedName</div>
+                <div class="text-xs text-muted">@selectedEmail</div>
+
+            </div>
+
+
+            <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;">
+
+                @foreach (var m in messages)
+                {
+
+                    @if (m.IsFromStaff || m.IsFromAI)
+                    {
+
+                        <div style="align-self:flex-end;max-width:70%;">
+
+                            <div class="text-xs text-muted mb-1" style="text-align:right;padding:0 4px;">
+                                @(m.IsFromAI ? "🤖 Trợ lý AI" : "🧑‍💼 Nhân viên")
+                            </div>
+
+                            <div class="chat-bubble"
+                                 style="background:@(m.IsFromAI ? "var(--surface-2)" : "var(--brand)");color:@(m.IsFromAI ? "var(--text)" : "#fff");padding:9px 13px;border-radius:14px 14px 4px 14px;">
+                                @m.Content
+                            </div>
+
+                            <div class="chat-meta text-xs text-right">
+                                @m.SentAt.ToLocalTime().ToString("HH:mm dd/MM")
+                            </div>
+
+                        </div>
+
+                    }
+                    else
+                    {
+
+                        <div style="align-self:flex-start;max-width:70%;">
+
+                            <div class="chat-bubble"
+                                 style="background:var(--surface-2);padding:9px 13px;border-radius:14px 14px 14px 4px;">
+                                @m.Content
+                            </div>
+
+                            <div class="chat-meta text-xs text-muted">
+                                @m.SentAt.ToLocalTime().ToString("HH:mm dd/MM")
+                            </div>
+
+                        </div>
+
+                    }
+
+                }
+
+                @if (messages.Count == 0)
+                {
+                    <div class="empty-state">
+                        <div class="empty-state-desc">
+                            Chưa có tin nhắn trong hội thoại này
+                        </div>
+                    </div>
+                }
+
+            </div>
+
+
+            <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;">
+
+                <input class="form-control"
+                       placeholder="Nhập tin nhắn..."
+                       @bind="replyText"
+                       @bind:event="oninput"
+                       @onkeydown="OnKey"
+                       disabled="@sending" />
+
+                <button class="btn btn-primary"
+                        @onclick="Reply"
+                        disabled="@(sending || string.IsNullOrWhiteSpace(replyText))">
+
+                    Gửi
+
+                </button>
+
+            </div>
+
+        }
+
+    </div>
+
+</div>
+
+
+@code {
+
+    List<ChatInboxItem> inbox = [];
+
+    List<ChatMessage> messages = [];
+
+    string? selectedUserId;
+
+    string selectedName = "";
+
+    string selectedEmail = "";
+
+    string replyText = "";
+
+    bool sending;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        inbox = await CommerceService.GetChatInboxAsync();
+    }
+
+
+    async Task SelectUser(string userId)
+    {
+
+        selectedUserId = userId;
+
+        var item = inbox.FirstOrDefault(i => i.UserId == userId);
+
+        selectedName = item?.FullName ?? "";
+
+        selectedEmail = item?.Email ?? "";
+
+        messages = await CommerceService.GetChatMessagesAsync(userId);
+
+    }
+
+
+    async Task OnKey(KeyboardEventArgs e)
+    {
+
+        if (e.Key == "Enter"
+        && !sending
+        && !string.IsNullOrWhiteSpace(replyText))
+        {
+            await Reply();
+        }
+
+    }
+
+
+    async Task Reply()
+    {
+
+        if (selectedUserId == null || string.IsNullOrWhiteSpace(replyText))
+            return;
+
+        sending = true;
+
+        var text = replyText.Trim();
+
+        replyText = "";
+
+        var msg =
+        await CommerceService.SendMessageAsync(
+        selectedUserId,
+        text,
+        isFromStaff: true);
+
+        messages.Add(msg);
+
+        inbox = await CommerceService.GetChatInboxAsync();
+
+        sending = false;
+
+        StateHasChanged();
+
+    }
+
+}

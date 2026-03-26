@@ -1,0 +1,362 @@
+@page "/chat"
+@using Microsoft.JSInterop
+@attribute [Authorize(Roles = "Customer,VipCustomer")]
+@using MiniShopee.Models
+@inject MiniShopee.Services.CommerceService CommerceService
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IConfiguration Config
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Tư vấn - MiniShopee</PageTitle>
+
+<div class="page-header-row mb-4">
+    <div>
+        <div class="page-title">💬 Tư vấn sản phẩm</div>
+        <div class="page-sub">Chat với nhân viên hoặc trợ lý AI</div>
+    </div>
+    <div class="flex gap-2 items-center">
+        @if (mode == "staff")
+        {
+            <span class="badge @(hubConnected ? "badge-green" : "badge-gray")" style="gap:6px;padding:5px 10px;">
+                <span class="signal-dot @(hubConnected ? "online" : "offline")"></span>
+                @(hubConnected ? "Đã kết nối" : "Đang kết nối...")
+            </span>
+            @if (staffOnline)
+            {
+                <span class="badge badge-green" style="gap:5px;">
+                    <span class="signal-dot online"></span> Nhân viên online
+                </span>
+            }
+        }
+        <button class="btn @(mode == "ai" ? "btn-primary" : "btn-secondary")"
+                @onclick='() => SwitchMode("ai")'>🤖 Trợ lý AI</button>
+        <button class="btn @(mode == "staff" ? "btn-primary" : "btn-secondary")"
+                @onclick='() => SwitchMode("staff")'>👤 Nhân viên</button>
+    </div>
+</div>
+
+<div class="chat-box">
+    <div class="chat-messages" id="chatMessages">
+
+        @if (mode == "ai")
+        {
+            @if (aiMessages.Count == 0 && !thinking)
+            {
+                <div class="empty-state" style="padding:40px 24px;margin:auto;">
+                    <div class="empty-state-icon">🤖</div>
+                    <div class="empty-state-title">Trợ lý AI sẵn sàng</div>
+                    <div class="empty-state-desc">Hỏi về sản phẩm, size, chất liệu, khuyến mãi...</div>
+                </div>
+            }
+            @foreach (var m in aiMessages)
+            {
+                var isMe = !m.IsFromAI;
+                <div class="chat-msg @(isMe ? "mine" : "ai")">
+                    @if (!isMe)
+                    {
+                        <div class="text-xs text-muted mb-1" style="padding:0 4px;">🤖 Trợ lý AI</div>
+                    }
+                    <div class="chat-bubble">@m.Content</div>
+                    <div class="chat-meta">@m.SentAt.ToLocalTime().ToString("HH:mm")</div>
+                </div>
+            }
+            @if (thinking && mode == "ai")
+            {
+                <div class="chat-msg ai">
+                    <div class="text-xs text-muted mb-1" style="padding:0 4px;">🤖 Trợ lý AI đang soạn...</div>
+                    <div class="chat-bubble typing"><span></span><span></span><span></span></div>
+                </div>
+            }
+        }
+        else
+        {
+            @if (staffMessages.Count == 0 && !thinking)
+            {
+                <div class="empty-state" style="padding:40px 24px;margin:auto;">
+                    <div class="empty-state-icon">👤</div>
+                    <div class="empty-state-title">Liên hệ nhân viên</div>
+                    <div class="empty-state-desc">Gửi tin nhắn, nhân viên sẽ phản hồi sớm nhất.</div>
+                </div>
+            }
+            @foreach (var m in staffMessages)
+            {
+                var isMe = !m.IsFromStaff;
+                <div class="chat-msg @(isMe ? "mine" : "theirs")">
+                    @if (!isMe)
+                    {
+                        <div class="text-xs text-muted mb-1" style="padding:0 4px;">👤 Nhân viên</div>
+                    }
+                    <div class="chat-bubble">@m.Content</div>
+                    <div class="chat-meta">@m.SentAt.ToLocalTime().ToString("HH:mm")</div>
+                </div>
+            }
+            @if (thinking && mode == "staff")
+            {
+                <div class="chat-msg theirs">
+                    <div class="text-xs text-muted mb-1" style="padding:0 4px;">👤 Nhân viên đang soạn...</div>
+                    <div class="chat-bubble typing"><span></span><span></span><span></span></div>
+                </div>
+            }
+        }
+
+    </div>
+
+    <!-- Gợi ý nhanh -->
+    <div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:7px;flex-wrap:wrap;background:var(--surface-2);">
+        @foreach (var q in suggestions)
+        {
+            var suggestion = q;
+            <button class="chip" style="font-size:11.5px;padding:4px 12px;"
+                    disabled="@thinking"
+                    @onclick="async () => { input = suggestion; await Send(); }">
+                @q
+            </button>
+        }
+    </div>
+
+    <div class="chat-input-wrap">
+        <textarea class="form-control"
+                  placeholder="Nhập câu hỏi... (Enter để gửi)"
+                  value="@input"
+                  @oninput="@(e => { input = e.Value?.ToString() ?? string.Empty; })"
+                  @onkeydown="OnKey"
+                  rows="1"
+                  disabled="@thinking"></textarea>
+        <button class="btn btn-primary"
+                @onclick="Send"
+                disabled="@thinking"
+                style="border-radius:50%;width:42px;height:42px;flex-shrink:0;padding:0;">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+            </svg>
+        </button>
+    </div>
+</div>
+
+@code {
+    // 2 list HOÀN TOÀN RIÊNG BIỆT — AI chat và Staff chat không liên quan nhau
+    List<ChatMessage> aiMessages    = [];
+    List<ChatMessage> staffMessages = [];
+
+    string input = "";
+    string? userId;
+    string mode = "ai";
+    bool thinking, staffOnline, hubConnected;
+    HubConnection? hub;
+
+    static readonly string[] suggestions =
+        ["Còn hàng không?", "Hướng dẫn chọn size?", "Chất liệu như thế nào?", "Thời gian giao hàng?", "Chính sách đổi trả?"];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(auth.User);
+        if (user == null) return;
+
+        userId = user.Id;
+
+        // Tải lịch sử và phân vào đúng list
+        var history = await CommerceService.GetChatMessagesAsync(user.Id);
+        foreach (var m in history)
+        {
+            if (m.IsFromAI)
+            {
+                // Tìm tin user tương ứng trước tin AI này (để hiện đúng context)
+                aiMessages.Add(m);
+            }
+            else if (m.IsFromStaff)
+            {
+                staffMessages.Add(m);
+            }
+            else
+            {
+                // Tin của khách: không biết gửi cho ai → thêm vào cả 2
+                // (trong thực tế nên lưu thêm field "chatMode" vào DB, nhưng hiện tại dùng cách này)
+                aiMessages.Add(m);
+                staffMessages.Add(m);
+            }
+        }
+
+        // Truyền userId vào query string "uid" — hub đọc trực tiếp
+        // (WebSocket không gửi cookie, AccessTokenProvider chỉ hoạt động với SSE/LongPolling)
+        var hubUrl = Nav.ToAbsoluteUri($"/hubs/chat?uid={Uri.EscapeDataString(userId ?? "")}");
+        hub = new HubConnectionBuilder()
+            .WithUrl(hubUrl)
+            .WithAutomaticReconnect()
+            .Build();
+
+        // Nhận tin từ staff
+        hub.On<object>("ReceiveMessage", async raw =>
+        {
+            try
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(raw);
+                var doc  = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                var incoming = new ChatMessage
+                {
+                    Id          = root.TryGetProperty("id",          out var id) ? id.GetInt32()        : 0,
+                    UserId      = root.TryGetProperty("userId",      out var u)  ? (u.GetString() ?? "") : "",
+                    Content     = root.TryGetProperty("content",     out var c)  ? (c.GetString() ?? "") : "",
+                    IsFromAI    = root.TryGetProperty("isFromAI",    out var ai) && ai.GetBoolean(),
+                    IsFromStaff = root.TryGetProperty("isFromStaff", out var sf) && sf.GetBoolean(),
+                    SentAt      = root.TryGetProperty("sentAt",      out var sat)
+                                    ? DateTime.Parse(sat.GetString()!) : DateTime.UtcNow,
+                };
+
+                // Chỉ thêm vào đúng list, không bao giờ lẫn
+                if (incoming.IsFromStaff)
+                {
+                    staffMessages.Add(incoming);
+                    if (mode == "staff") thinking = false;
+                }
+                // IsFromAI qua hub thường không xảy ra (AI xử lý đồng bộ) nhưng để phòng
+                else if (incoming.IsFromAI)
+                {
+                    aiMessages.Add(incoming);
+                    if (mode == "ai") thinking = false;
+                }
+
+                await InvokeAsync(StateHasChanged);
+                await JS.InvokeVoidAsync("scrollChatBottom");
+            }
+            catch { }
+        });
+
+        hub.On<bool>("StaffOnline", online =>
+        {
+            staffOnline = online;
+            InvokeAsync(StateHasChanged);
+        });
+
+        hub.Reconnecting += _ => { hubConnected = false; InvokeAsync(StateHasChanged); return Task.CompletedTask; };
+        hub.Reconnected  += _ => { hubConnected = true;  InvokeAsync(StateHasChanged); return Task.CompletedTask; };
+
+        try
+        {
+            await hub.StartAsync();
+            hubConnected = hub.State == HubConnectionState.Connected;
+        }
+        catch { hubConnected = false; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (first) await JS.InvokeVoidAsync("scrollChatBottom");
+    }
+
+    void SwitchMode(string m)
+    {
+        mode = m;
+        thinking = false;
+        _ = JS.InvokeVoidAsync("scrollChatBottom");
+    }
+
+    async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey && !thinking && !string.IsNullOrWhiteSpace(input))
+            await Send();
+    }
+
+    async Task Send()
+    {
+        var text = input.Trim();
+        if (string.IsNullOrWhiteSpace(text) || userId == null || thinking) return;
+
+        input = "";
+
+        if (mode == "ai")
+        {
+            // ── AI mode ──────────────────────────────────────────────
+            thinking = true;
+            aiMessages.Add(new ChatMessage { UserId = userId, Content = text, SentAt = DateTime.UtcNow });
+            StateHasChanged();
+            await JS.InvokeVoidAsync("scrollChatBottom");
+
+            try
+            {
+                await CommerceService.SendMessageAsync(userId, text);
+                var reply = await CallAI(text);
+                var aiMsg = await CommerceService.SendMessageAsync(userId, reply, isFromAI: true);
+                aiMessages.Add(aiMsg);
+            }
+            catch
+            {
+                aiMessages.Add(new ChatMessage
+                {
+                    UserId = userId, Content = "⚠️ Có lỗi xảy ra, vui lòng thử lại.",
+                    IsFromAI = true, SentAt = DateTime.UtcNow
+                });
+            }
+            finally
+            {
+                thinking = false;
+                StateHasChanged();
+                await JS.InvokeVoidAsync("scrollChatBottom");
+            }
+        }
+        else
+        {
+            // ── Staff mode ────────────────────────────────────────────
+            // Hiện tin optimistic ngay, KHÔNG set thinking (để user vẫn gõ được)
+            staffMessages.Add(new ChatMessage { UserId = userId, Content = text, SentAt = DateTime.UtcNow });
+            StateHasChanged();
+            await JS.InvokeVoidAsync("scrollChatBottom");
+
+            try
+            {
+                if (hub != null && hub.State == HubConnectionState.Connected)
+                    await hub.SendAsync("SendToStaff", text);
+                else
+                    await CommerceService.SendMessageAsync(userId, text);
+            }
+            catch { /* tin vẫn hiện optimistic */ }
+        }
+    }
+
+    async Task<string> CallAI(string question)
+    {
+        try
+        {
+            var key = Config["Anthropic:ApiKey"] ?? "";
+            if (string.IsNullOrEmpty(key))
+                return "Trợ lý AI chưa được cấu hình. Vui lòng liên hệ nhân viên.";
+
+            using var http = new HttpClient();
+            http.DefaultRequestHeaders.Add("x-api-key", key);
+            http.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+
+            var body = new
+            {
+                model = "claude-haiku-4-5-20251001",
+                max_tokens = 400,
+                system = "Bạn là nhân viên tư vấn MiniShopee - cửa hàng thời trang online. Trả lời ngắn gọn, thân thiện bằng tiếng Việt. Sản phẩm: áo thun, polo, sơ mi, hoodie, áo khoác. Giá: 150K–650K. Giao hàng 2–3 ngày. Đổi trả 30 ngày.",
+                messages = new[] { new { role = "user", content = question } }
+            };
+
+            var res = await http.PostAsync(
+                "https://api.anthropic.com/v1/messages",
+                new StringContent(System.Text.Json.JsonSerializer.Serialize(body),
+                    System.Text.Encoding.UTF8, "application/json"));
+
+            if (!res.IsSuccessStatusCode)
+                return "Trợ lý AI đang bận. Vui lòng thử lại hoặc liên hệ nhân viên.";
+
+            var json = await res.Content.ReadAsStringAsync();
+            return System.Text.Json.JsonDocument.Parse(json)
+                       .RootElement.GetProperty("content")[0]
+                       .GetProperty("text").GetString()
+                   ?? "Không có phản hồi.";
+        }
+        catch { return "Có lỗi xảy ra. Vui lòng thử lại."; }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hub != null) await hub.DisposeAsync();
+    }
+}

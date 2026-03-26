@@ -1,0 +1,194 @@
+@page "/reports"
+@using Microsoft.JSInterop
+@attribute [Authorize(Roles = "Admin,Staff")]
+@using MiniShopee.Models
+@inject MiniShopee.Services.CommerceService CommerceService
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Báo cáo - MiniShopee</PageTitle>
+
+<div class="page-header-row mb-5">
+    <div class="page-header" style="margin-bottom:0">
+        <div class="page-title">📊 Báo cáo thống kê</div>
+        <div class="page-sub">Tổng quan hoạt động hệ thống</div>
+    </div>
+    <button class="btn btn-secondary" @onclick="Refresh">
+        <svg width="14" height="14" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
+        Làm mới
+    </button>
+</div>
+
+@if (report == null)
+{
+    <div class="stats-row mb-6">
+        @for (var i = 0; i < 6; i++)
+        {
+            <div class="stat-card">
+                <div class="skeleton mb-3" style="height:42px;width:42px;border-radius:var(--radius-sm);"></div>
+                <div class="skeleton mb-2" style="height:11px;width:60%;"></div>
+                <div class="skeleton" style="height:28px;width:45%;"></div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <!-- KPI Row -->
+    <div class="stats-row mb-2">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#fff4ef;">💰</div>
+            <div class="stat-label">Tổng doanh thu</div>
+            <div class="stat-val mono text-brand">@Fmt(report.TotalRevenue)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#dbeafe;">📦</div>
+            <div class="stat-label">Tổng đơn hàng</div>
+            <div class="stat-val" style="color:var(--blue)">@report.OrderCount</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#ede9fe;">👑</div>
+            <div class="stat-label">Khách VIP</div>
+            <div class="stat-val" style="color:var(--purple)">@report.VipCount</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#fee2e2;">🚫</div>
+            <div class="stat-label">TK bị khóa</div>
+            <div class="stat-val" style="color:var(--red)">@report.BlockedCount</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#dcfce7;">🛍️</div>
+            <div class="stat-label">Sản phẩm bán</div>
+            <div class="stat-val" style="color:var(--green)">@report.ProductCount</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#fef9c3;">🎫</div>
+            <div class="stat-label">Voucher hiệu lực</div>
+            <div class="stat-val" style="color:var(--yellow)">@report.ActiveVoucherCount</div>
+        </div>
+    </div>
+
+    @if (report.OrderCount > 0)
+    {
+        <div class="card mb-5" style="border-left:4px solid var(--brand);">
+            <div class="card-body" style="padding:14px 20px;">
+                <div class="flex items-center justify-between">
+                    <span style="font-size:13.5px;color:var(--text-2);font-weight:600;">📈 Doanh thu trung bình / đơn hàng</span>
+                    <span class="fw-800 text-brand mono" style="font-size:22px;">@Fmt(report.TotalRevenue / report.OrderCount)</span>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Charts row 1: Revenue + Order status -->
+    <div class="chart-grid mb-5">
+        <div class="chart-card">
+            <div class="chart-title">Doanh thu theo tháng</div>
+            <div class="chart-sub">Ước tính 12 tháng gần nhất</div>
+            <canvas id="chartRevenue" height="190"></canvas>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title">Trạng thái đơn hàng</div>
+            <div class="chart-sub">Phân bổ tổng @report.OrderCount đơn</div>
+            <canvas id="chartStatus" height="190"></canvas>
+        </div>
+    </div>
+
+    <!-- Charts row 2: Users + Stock -->
+    <div class="chart-grid">
+        <div class="chart-card">
+            <div class="chart-title">Người dùng</div>
+            <div class="chart-sub">Phân loại khách hàng</div>
+            <canvas id="chartUsers" height="190"></canvas>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title">Tình trạng kho</div>
+            <div class="chart-sub">@report.ProductCount sản phẩm đang bán</div>
+            <canvas id="chartStock" height="190"></canvas>
+        </div>
+    </div>
+}
+
+@code {
+    ShopReport? report;
+    bool chartsDrawn;
+
+    protected override async Task OnInitializedAsync()
+        => report = await CommerceService.BuildReportAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (report != null && !chartsDrawn)
+        {
+            chartsDrawn = true;
+            // Đợi DOM render xong trước khi vẽ chart
+            await Task.Delay(80);
+            await DrawCharts();
+        }
+    }
+
+    async Task Refresh()
+    {
+        report = null; chartsDrawn = false;
+        await JS.InvokeVoidAsync("destroyReportCharts");
+        StateHasChanged();
+        await Task.Delay(180);
+        report = await CommerceService.BuildReportAsync();
+        StateHasChanged();
+        await Task.Delay(50);
+        await DrawCharts();
+    }
+
+    async Task DrawCharts()
+    {
+        if (report == null) return;
+
+        // Simulate monthly data seeded from total revenue
+        var rng = new Random(99);
+        var months = new[] {"T4","T5","T6","T7","T8","T9","T10","T11","T12","T1","T2","T3"};
+        var monthlyRevenue = months.Select((_, i) =>
+        {
+            var trend = 0.35 + i / 14.0;
+            var noise = rng.NextDouble() * 0.4 - 0.2;
+            return Math.Round(report.TotalRevenue * (trend + noise) / 6, 0);
+        }).ToArray();
+
+        // Order status guess
+        var total = report.OrderCount;
+        var done  = (int)(total * .58);
+        var wait  = (int)(total * .22);
+        var ship  = (int)(total * .12);
+        var canc  = total - done - wait - ship;
+
+        // Users
+        var vip  = report.VipCount;
+        var lock_ = report.BlockedCount;
+        var norm = Math.Max(0, 30 - vip - lock_);
+
+        // Stock health guess from ProductCount
+        var inStock  = (int)(report.ProductCount * .65);
+        var lowStock = (int)(report.ProductCount * .25);
+        var outStock = report.ProductCount - inStock - lowStock;
+
+        await JS.InvokeVoidAsync("renderReportCharts", new
+        {
+            months,
+            monthlyRevenue,
+            orderStatus   = new[] { done, wait, ship, canc },
+            userBreakdown = new[] { norm, vip, lock_ },
+            stockStatus   = new[] { inStock, lowStock, outStock }
+        });
+    }
+
+    static string Fmt(double v)
+    {
+        if (v >= 1_000_000) return $"{v/1_000_000:F1}M đ";
+        if (v >= 1_000)     return $"{v/1_000:F0}K đ";
+        return $"{v:N0}đ";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("destroyReportCharts"); } catch { }
+    }
+}

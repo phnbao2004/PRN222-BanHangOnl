@@ -1,0 +1,368 @@
+@page "/manage-orders"
+@attribute [Authorize(Roles = "Admin,Staff")]
+@using MiniShopee.Models
+@inject MiniShopee.Services.CommerceService CommerceService
+@inject UserManager<ApplicationUser> UserManager
+
+<PageTitle>Quản lý đơn hàng - MiniShopee</PageTitle>
+
+<div class="page-header-row mb-4">
+    <div class="page-header" style="margin-bottom:0;">
+        <div class="page-title">📦 Quản lý đơn hàng</div>
+        <div class="page-sub">@all.Count đơn hàng tổng cộng</div>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(msg))
+{
+    <div class="alert alert-success mb-4">@msg</div>
+}
+
+<!-- Thống kê nhanh -->
+<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:20px;">
+    @foreach (var (status, icon, color) in statusStats)
+    {
+        var cnt = all.Count(o => o.Status == status);
+        <div @onclick="@(() => { activeTab = "orders"; filterStatus = status; })"
+             style="background:var(--surface);border:1.5px solid @(filterStatus == status && activeTab=="orders" ? color : "var(--border)");
+                    border-radius:var(--radius);padding:12px;cursor:pointer;text-align:center;transition:.12s;">
+            <div style="font-size:18px;">@icon</div>
+            <div style="font-size:18px;font-weight:800;color:@color;">@cnt</div>
+            <div style="font-size:10.5px;color:var(--text-3);margin-top:2px;">@status</div>
+        </div>
+    }
+</div>
+
+<!-- Tabs -->
+<div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;">
+    @foreach (var (t, label, badge, color) in new[]{
+        ("orders",  "📋 Tất cả đơn",     filtered.Count,         "var(--text)"),
+        ("returns", "🔄 Hoàn hàng",       returnedOrders.Count,   "#d97706"),
+        ("risk",    "⚠️ Khách hoàn nhiều", riskUsers.Count,        "#dc2626"),
+    })
+    {
+        var tab = t;
+        <button @onclick="() => activeTab = tab"
+                style="padding:10px 22px;border:none;background:none;cursor:pointer;font-size:13px;
+                       font-weight:@(activeTab==tab?"700":"500");
+                       color:@(activeTab==tab?color:"var(--text-3)");
+                       border-bottom:@(activeTab==tab?$"3px solid {color}":"3px solid transparent");
+                       margin-bottom:-2px;transition:.12s;">
+            @label
+            <span style="margin-left:6px;background:@(activeTab==tab?color:"var(--border)");
+                         color:@(activeTab==tab?"#fff":"var(--text-3)");
+                         padding:1px 8px;border-radius:20px;font-size:11px;font-weight:700;">@badge</span>
+        </button>
+    }
+</div>
+
+<!-- TAB: TẤT CẢ ĐƠN -->
+@if (activeTab == "orders")
+{
+    <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;">
+        <select class="form-select" style="width:180px;" @bind="filterStatus">
+            <option value="">Tất cả trạng thái</option>
+            <option>Pending</option><option>Confirmed</option><option>Packing</option>
+            <option>Shipping</option><option>Delivered</option><option>Cancelled</option><option>Returned</option>
+        </select>
+        <div class="search-wrap" style="max-width:240px">
+            <svg class="search-icon" width="15" height="15" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+            </svg>
+            <input class="form-control" placeholder="Tìm tên, email, mã đơn..."
+                   value="@searchOrder" @oninput="@(e => { searchOrder = e.Value?.ToString() ?? string.Empty; Filter(); })" />
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Mã đơn</th><th>Khách hàng</th><th>Sản phẩm</th>
+                    <th>Giao đến</th><th>Ngày đặt</th><th>Tổng tiền</th>
+                    <th>Trạng thái</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var o in filtered)
+                {
+                    var (_, icon, color) = statusStats.FirstOrDefault(s => s.status == o.Status);
+                    <tr style="@(o.Status=="Returned"?"background:#fffbeb;":o.Status=="Cancelled"?"opacity:.6;":"")">
+                        <td class="fw-700">#@o.Id</td>
+                        <td>
+                            <div class="fw-600 text-sm">@o.User?.FullName</div>
+                            <div class="text-muted text-xs">@o.User?.Email</div>
+                        </td>
+                        <td style="max-width:180px;">
+                            <div style="font-size:12px;color:var(--text-2);">
+                                @foreach (var item in o.Items.Take(2))
+                                { <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">• @item.Product?.Name (@item.Quantity)</div> }
+                                @if (o.Items.Count > 2)
+                                { <div style="color:var(--text-3);">+@(o.Items.Count - 2) sản phẩm khác</div> }
+                            </div>
+                        </td>
+                        <td>
+                            <div class="text-sm">@o.ReceiverName — @o.ReceiverPhone</div>
+                            <div class="text-muted text-xs truncate" style="max-width:140px;">@o.ShippingAddress</div>
+                        </td>
+                        <td class="mono text-sm">@o.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                        <td class="mono fw-700 text-brand">@o.TotalVnd.ToString("N0")đ</td>
+                        <td>
+                            <select class="form-select" style="min-width:130px;font-size:12px;padding:4px 8px;border-color:@color;"
+                                    @bind="statusMap[o.Id]">
+                                <option>Pending</option><option>Confirmed</option><option>Packing</option>
+                                <option>Shipping</option><option>Delivered</option><option>Cancelled</option><option>Returned</option>
+                            </select>
+                        </td>
+                        <td>
+                            <button class="btn btn-primary btn-sm" @onclick="() => Save(o.Id)">Lưu</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<!-- TAB: HOÀN HÀNG -->
+@if (activeTab == "returns")
+{
+    <!-- Thống kê tổng quan hoàn hàng -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;">
+        <div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:var(--radius-lg);padding:18px 20px;">
+            <div style="font-size:11px;color:#92400e;font-weight:600;margin-bottom:4px;">TỔNG ĐƠN HOÀN</div>
+            <div style="font-size:28px;font-weight:800;color:#92400e;">@returnedOrders.Count</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#fee2e2,#fecaca);border-radius:var(--radius-lg);padding:18px 20px;">
+            <div style="font-size:11px;color:#991b1b;font-weight:600;margin-bottom:4px;">GIÁ TRỊ HOÀN</div>
+            <div style="font-size:22px;font-weight:800;color:#991b1b;">@returnedOrders.Sum(o=>o.TotalVnd).ToString("N0")đ</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);border-radius:var(--radius-lg);padding:18px 20px;">
+            <div style="font-size:11px;color:#5b21b6;font-weight:600;margin-bottom:4px;">KHÁCH HOÀN</div>
+            <div style="font-size:28px;font-weight:800;color:#5b21b6;">@returnedOrders.Select(o=>o.UserId).Distinct().Count()</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);border-radius:var(--radius-lg);padding:18px 20px;">
+            <div style="font-size:11px;color:#166534;font-weight:600;margin-bottom:4px;">TỈ LỆ HOÀN</div>
+            <div style="font-size:28px;font-weight:800;color:#166534;">
+                @(all.Count > 0 ? $"{100.0*returnedOrders.Count/all.Count:F1}%" : "0%")
+            </div>
+        </div>
+    </div>
+
+    <!-- Danh sách đơn hoàn -->
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Mã đơn</th><th>Khách hàng</th><th>Sản phẩm hoàn</th>
+                    <th>Giá trị</th><th>Ngày đặt</th><th>Uy tín KH</th><th>Hành động</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var o in returnedOrders.OrderByDescending(o => o.CreatedAt))
+                {
+                    var user = userCache.GetValueOrDefault(o.UserId);
+                    <tr style="background:#fffbeb;">
+                        <td class="fw-700">#@o.Id</td>
+                        <td>
+                            <div class="fw-600 text-sm">@(o.User?.FullName ?? "—")</div>
+                            <div class="text-muted text-xs">@o.User?.Email</div>
+                        </td>
+                        <td>
+                            <div style="font-size:12px;color:var(--text-2);">
+                                @foreach (var item in o.Items.Take(3))
+                                { <div>• @item.Product?.Name ×@item.Quantity</div> }
+                                @if (o.Items.Count > 3) { <div style="color:var(--text-3);">+@(o.Items.Count-3) nữa</div> }
+                            </div>
+                        </td>
+                        <td class="mono fw-700" style="color:#dc2626;">@o.TotalVnd.ToString("N0")đ</td>
+                        <td class="mono text-sm">@o.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                        <td>
+                            @if (user != null)
+                            {
+                                var repColor = user.ReputationPoints >= 7 ? "#16a34a" : user.ReputationPoints >= 4 ? "#f59e0b" : "#dc2626";
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <div style="width:50px;height:5px;border-radius:3px;background:var(--border);overflow:hidden;">
+                                        <div style="height:100%;width:@(user.ReputationPoints*10)%;background:@repColor;"></div>
+                                    </div>
+                                    <span style="font-size:12px;font-weight:700;color:@repColor;">@user.ReputationPoints/10</span>
+                                    @if (user.ReturnCount >= 2) { <span class="badge badge-red" style="font-size:10px;">⚠️ @user.ReturnCount lần</span> }
+                                </div>
+                            }
+                        </td>
+                        <td>
+                            <button class="btn btn-ghost btn-sm"
+                                    @onclick="@(() => { filterStatus = "Returned"; activeTab = "orders"; })"
+                                    title="Xem trong danh sách đơn">
+                                📋 Chi tiết
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<!-- TAB: KHÁCH HOÀN NHIỀU -->
+@if (activeTab == "risk")
+{
+    <div style="background:#fee2e2;border:1.5px solid #fca5a5;border-radius:var(--radius-lg);padding:14px 18px;margin-bottom:18px;display:flex;gap:12px;align-items:center;">
+        <span style="font-size:22px;">⚠️</span>
+        <div>
+            <div style="font-weight:700;font-size:13.5px;color:#991b1b;">Danh sách khách hàng có hành vi hoàn/hủy bất thường</div>
+            <div style="font-size:12.5px;color:#7f1d1d;">Những khách này đã hoàn ≥2 đơn hoặc có tỉ lệ hủy/hoàn cao. Xem xét xử lý tại trang Quản lý người dùng.</div>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Khách hàng</th><th>Tổng đơn</th><th>Đã hủy</th>
+                    <th>Đã hoàn</th><th>Tỉ lệ xấu</th><th>Uy tín</th><th>Mức cảnh báo</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in riskUsers)
+                {
+                    var badRate = r.TotalOrders > 0 ? (double)(r.CancelCount + r.ReturnCount) / r.TotalOrders : 0;
+                    var repColor = r.User.ReputationPoints >= 7 ? "badge-green" : r.User.ReputationPoints >= 4 ? "badge-yellow" : "badge-red";
+                    <tr style="background:@(r.User.WarningLevel>=3?"#fee2e2;":r.User.WarningLevel>=2?"#fff7ed;":r.User.WarningLevel>=1?"#fefce8;":"")">
+                        <td>
+                            <div class="fw-600">@r.User.FullName</div>
+                            <div class="text-muted text-xs">@r.User.Email</div>
+                        </td>
+                        <td class="fw-700">@r.TotalOrders</td>
+                        <td>
+                            <span class="badge @(r.CancelCount>=5?"badge-red":r.CancelCount>=3?"badge-yellow":"badge-gray")">
+                                @r.CancelCount đơn
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge @(r.ReturnCount>=3?"badge-red":r.ReturnCount>=2?"badge-yellow":"badge-gray")">
+                                🔄 @r.ReturnCount đơn
+                            </span>
+                        </td>
+                        <td>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <div style="width:70px;height:6px;border-radius:3px;background:var(--border);overflow:hidden;">
+                                    <div style="height:100%;width:@(Math.Min(100,(int)(badRate*100)))%;
+                                                background:@(badRate>=0.5?"#dc2626":badRate>=0.3?"#f97316":"#eab308");border-radius:3px;"></div>
+                                </div>
+                                <span style="font-size:12px;font-weight:700;">@badRate.ToString("P0")</span>
+                            </div>
+                        </td>
+                        <td><span class="badge @repColor">@r.User.ReputationPoints/10</span></td>
+                        <td>
+                            @if (r.User.IsBlocked)
+                            { <span class="badge badge-red">🔒 Đã khóa</span> }
+                            else
+                            {
+                                var warnLabel = r.User.WarningLevel switch {
+                                    0 => ("badge-gray", "Bình thường"),
+                                    1 => ("badge-yellow", "⚠️ Cảnh báo 1"),
+                                    2 => ("", "🔴 Cảnh báo 2"),
+                                    _ => ("badge-red", "🔒 Nguy hiểm")
+                                };
+                                <span class="badge @warnLabel.Item1" style="@(r.User.WarningLevel==2?"background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;":"")">
+                                    @warnLabel.Item2
+                                </span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    List<Order> all = [];
+    List<Order> filtered = [];
+    List<Order> returnedOrders = [];
+    Dictionary<int, string> statusMap = [];
+    Dictionary<string, ApplicationUser> userCache = [];
+    List<RiskUser> riskUsers = [];
+
+    string msg = "";
+    string activeTab = "orders";
+    string searchOrder = "";
+    string _filterStatus = "";
+    string filterStatus { get => _filterStatus; set { _filterStatus = value; Filter(); } }
+
+    record RiskUser(ApplicationUser User, int TotalOrders, int CancelCount, int ReturnCount);
+
+    static readonly (string status, string icon, string color)[] statusStats =
+    [
+        ("Pending",   "⏳", "#f59e0b"),
+        ("Confirmed", "✅", "#3b82f6"),
+        ("Packing",   "📦", "#8b5cf6"),
+        ("Shipping",  "🚚", "#06b6d4"),
+        ("Delivered", "🎉", "#16a34a"),
+        ("Cancelled", "❌", "#dc2626"),
+        ("Returned",  "🔄", "#d97706"),
+    ];
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    async Task Load()
+    {
+        all = await CommerceService.GetAllOrdersAsync();
+        statusMap = all.ToDictionary(o => o.Id, o => o.Status ?? "Pending");
+        returnedOrders = all.Where(o => o.Status == "Returned").ToList();
+
+        // Cache user info
+        var userIds = all.Select(o => o.UserId).Distinct().ToList();
+        userCache = [];
+        foreach (var uid in userIds)
+        {
+            var u = await UserManager.FindByIdAsync(uid);
+            if (u != null) userCache[uid] = u;
+        }
+
+        // Build risk users: hoàn ≥2 hoặc hủy ≥3 hoặc tỉ lệ xấu ≥30%
+        var grouped = all.GroupBy(o => o.UserId).Select(g => new {
+            UserId      = g.Key,
+            Total       = g.Count(),
+            Cancelled   = g.Count(o => o.Status == "Cancelled"),
+            Returned    = g.Count(o => o.Status == "Returned"),
+        }).ToList();
+
+        riskUsers = grouped
+            .Where(g => g.Returned >= 2 || g.Cancelled >= 3
+                     || (g.Total > 0 && (double)(g.Cancelled + g.Returned) / g.Total >= 0.3))
+            .Select(g => {
+                var u = userCache.GetValueOrDefault(g.UserId);
+                return u == null ? null : new RiskUser(u, g.Total, g.Cancelled, g.Returned);
+            })
+            .Where(r => r != null)
+            .Select(r => r!)
+            .OrderByDescending(r => r.ReturnCount * 2 + r.CancelCount)
+            .ToList();
+
+        Filter();
+    }
+
+    void Filter()
+    {
+        var q = all.AsEnumerable();
+        if (!string.IsNullOrEmpty(_filterStatus))
+            q = q.Where(o => (o.Status ?? "").Equals(_filterStatus, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(searchOrder))
+            q = q.Where(o =>
+                o.Id.ToString().Contains(searchOrder) ||
+                (o.User?.FullName ?? "").Contains(searchOrder, StringComparison.OrdinalIgnoreCase) ||
+                (o.User?.Email ?? "").Contains(searchOrder, StringComparison.OrdinalIgnoreCase));
+        filtered = q.ToList();
+    }
+
+    async Task Save(int id)
+    {
+        if (!statusMap.TryGetValue(id, out var status)) return;
+        await CommerceService.UpdateOrderStatusAsync(id, status);
+        msg = $"✅ Đã cập nhật đơn #{id} → {status}" + (status == "Returned" ? " (đã hoàn kho + ghi nhận uy tín)" : "");
+        await Load();
+        _ = Task.Delay(3500).ContinueWith(_ => { msg = ""; InvokeAsync(StateHasChanged); });
+    }
+}
